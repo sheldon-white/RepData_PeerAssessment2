@@ -1,31 +1,25 @@
 library(stringr)
 
-stormData = read.csv("repdata-data-StormData.csv")
+#stormData = read.csv("repdata-data-StormData.csv")
+#meaningfulData = stormData[stormData$FATALITIES > 0 | stormData$INJURIES > 0 | stormData$PROPDMG > 0 | stormData$CROPDMG > 0,]
+#meaningfulData$normalizedEvtype = str_trim(tolower(meaningfulData$EVTYPE))
+#meaningfulData$event = NA
+#write.csv(meaningfulData, file = "meaningful.csv")
 
-meaningfulData = stormData[stormData$FATALITIES > 0 | stormData$INJURIES > 0 | stormData$PROPDMG > 0 | stormData$CROPDMG > 0,]
+if (!exists("meaningfulData")) {
+    meaningfulData = read.csv("meaningful.csv")
+}
 
-meaningfulData$normalizedEvtype = str_trim(tolower(meaningfulData$EVTYPE))
-meaningfulData$destEvtype = NA
-
-destEvtypes = read.csv("destEvtypes.csv", header = FALSE)
-destEvtypes$V1 = tolower(destEvtypes$V1)
-colnames(destEvtypes) = c("name")
-
-by(destEvtypes, 1:nrow(destEvtypes), function(row) {
-    evtype = row$name
-    matches = grepl(evtype, meaningfulData$normalizedEvtype) & is.na(meaningfulData$destEvtype)
-    meaningfulData[matches, "destEvtype"] <<- evtype
-})
-
-uncategorized = meaningfulData[is.na(meaningfulData$destEvtype),]
-message("uncategorized count = ", nrow(uncategorized))
-
+evTypes = read.csv("destEvtypes.csv", header = FALSE)
+evTypes$V1 = tolower(evTypes$V1)
+evTypes$evtype = evTypes$V1
+colnames(evTypes) = c("pattern", "evtype")
 
 rules = c(  
     "(typhoon|hurricane)", "hurricane (typhoon)",
     "(wall cloud|micoburst|microburst|downburst|turbulence|thunder|tstm)", "thunderstorm wind",
-    "chill", "extreme cold/wind chill",
-    "wind", "high wind",  
+    "chill", "extreme cold/wind chill",  
+    "wind", "high wind",   
     "ice fog", "freezing fog",
     "fog and cold temperatures", "freezing fog",
     "fog", "dense fog",
@@ -35,6 +29,7 @@ rules = c(
     "(ligntning|lighting)", "lightning",
     "(heavy|hvy|excessive|torrential|record).+(rain|rainfall|rainstorm|precipatation|precipitation)", "heavy rain",
     "(shower|rainstorm|rain damage|prolonged rain)", "heavy rain",
+    "mixed precipitation", "heavy rain",   
     "rain.+heavy", "heavy rain",
     "(heavy|hvy|excessive|torrential|record).+snow", "heavy snow",
     "snow", "winter weather",
@@ -60,31 +55,43 @@ rules = c(
     "(hot|warm)", "heat",
     "record high", "heat",
     "high temperature", "excessive heat",
-    "(landslide|mud|landslump)", "debris flow",
+    "(slide|mud|landslump)", "debris flow",
     "avalance", "avalanche",
     "flash floooding", "flash flood",
     "(high water|fld|rapidly rising water)", "flood",
     "dust devel", "dust devil",
     "dust", "dust storm",
     "ice pellets", "hail",
-    "(ice|icy)", "frost/freeze"
+    "(ice|icy|glaze)", "frost/freeze"
 )
 
 ruleset = data.frame(matrix(rules, ncol=2, byrow=TRUE))
 colnames(ruleset) = c("pattern", "evtype")
+allRules = rbind(evTypes, ruleset)
 
-by(ruleset, 1:nrow(ruleset), function(rule) {
-    pattern = rule$pattern
-    evtype = rule$evtype
+apply(allRules, 1, function(row) {
+    pattern = row[1]   
+    evtype = row[2]
     message(pattern, " - ", evtype)
-    meaningfulData[grepl(pattern, meaningfulData$normalizedEvtype) & is.na(meaningfulData$destEvtype), "destEvtype"] <<- evtype
+    matches = grepl(pattern, meaningfulData$normalizedEvtype) & is.na(meaningfulData$event)
+    meaningfulData[matches, "event"] <<- evtype
 })
 
-categorized = meaningfulData[!is.na(meaningfulData$destEvtype),]
-uncategorized = meaningfulData[is.na(meaningfulData$destEvtype),]
-message("uncategorized count = ", nrow(uncategorized))
+damageData = meaningfulData[meaningfulData$PROPDMG > 0 | meaningfulData$CROPDMG > 0,]
+damageData = damageData[damageData$PROPDMGEXP %in% c("M", "K") | damageData$CROPDMGEXP %in% c("M", "K"),]
+damageData$PROPDMGEXP = ifelse(damageData$PROPDMGEXP == "K", 1000, damageData$PROPDMGEXP)
+damageData$CROPDMGEXP = ifelse(damageData$CROPDMGEXP == "K", 1000, damageData$CROPDMGEXP)
+damageData$PROPDMGEXP = ifelse(damageData$PROPDMGEXP == "M", 1000000, damageData$PROPDMGEXP)
+damageData$CROPDMGEXP = ifelse(damageData$CROPDMGEXP == "M", 1000000, damageData$CROPDMGEXP)
+damageData$propDmgDollars = damageData$PROPDMGEXP * damageData$PROPDMG
+damageData$cropDmgDollars = damageData$CROPDMGEXP * damageData$CROPDMG
 
-damageData = meaningfulData[stormData$PROPDMG > 0 | stormData$CROPDMG > 0,]
-damageData[is.na(damageData$PROPDMGEXP), c("PROPDMGEXP")] = 1
-damageData$PROPDMGEXP[damageData$PROPDMGEXP == factor('K')] = 1000
-class(damageData$PROPDMGEXP)
+uncategorized = damageData[is.na(damageData$event),]
+
+damage = damageData[!is.na(damageData$event), c("propDmgDollars", "cropDmgDollars", "event")]
+damage$event = factor(damage$event)
+
+message("uncategorized damage: ", sum(uncategorized$propDmgDollars) + sum(uncategorized$cropDmgDollars))
+message("categorized damage: ", sum(damage$propDmgDollars) + sum(damage$cropDmgDollars))
+
+

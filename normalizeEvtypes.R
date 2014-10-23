@@ -53,11 +53,12 @@ rules = c(
     "(slide|mud|landslump)", "debris flow",
     "avalance", "avalanche",
     "flash floooding", "flash flood",
+    "mixed precipitation", "heavy rain",
     "(high water|fld|rapidly rising water)", "flood",
     "dust devel", "dust devil",
     "dust", "dust storm",
     "ice pellets", "hail",
-    "(ice|icy)", "frost/freeze"
+    "(glaze|ice|icy)", "frost/freeze"
 )
 
 ruleset = data.frame(matrix(rules, ncol=2, byrow=TRUE))
@@ -72,10 +73,11 @@ apply(allRules, 1, function(row) {
     dataEvtypes[matches, "dest"] <<- evtype
 })
 
+
+
+dataEvtypes[grepl("(none|\\?|summary|other)", dataEvtypes$normalized) & is.na(dataEvtypes$dest), "dest"] = "unknown"
+
 uncategorized = dataEvtypes[is.na(dataEvtypes$dest),]
-
-
-#dataEvtypes[grepl("(none|\\?|summary|other)", dataEvtypes$normalized) & is.na(dataEvtypes$dest), "dest"] = "unknown"
 
 
 

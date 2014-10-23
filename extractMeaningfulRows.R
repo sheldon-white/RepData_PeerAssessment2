@@ -10,58 +10,48 @@ if (!exists("meaningfulData")) {
     meaningfulData = read.csv("meaningful.csv")
 }
 
-evTypes = read.csv("destEvtypes.csv", header = FALSE)
-evTypes$V1 = tolower(evTypes$V1)
+evTypes = read.csv("eventtypes.csv", header = FALSE)
+evTypes$V1 = str_trim(tolower(evTypes$V1))
 evTypes$evtype = evTypes$V1
 colnames(evTypes) = c("pattern", "evtype")
+evTypes$pattern = paste("^", evTypes$pattern, "$", sep="")
 
 rules = c(  
     "(typhoon|hurricane)", "hurricane (typhoon)",
     "(wall cloud|micoburst|microburst|downburst|turbulence|thunder|tstm)", "thunderstorm wind",
     "chill", "extreme cold/wind chill",  
     "wind", "high wind",   
-    "ice fog", "freezing fog",
     "fog and cold temperatures", "freezing fog",
     "fog", "dense fog",
     "gustnado", "high wind",
-    "torndao", "tornado",
-    "funnel", "funnel cloud",
+    "(tornado|torndao)", "tornado",
     "(ligntning|lighting)", "lightning",
     "(heavy|hvy|excessive|torrential|record).+(rain|rainfall|rainstorm|precipatation|precipitation)", "heavy rain",
     "(shower|rainstorm|rain damage|prolonged rain)", "heavy rain",
     "mixed precipitation", "heavy rain",   
-    "rain.+heavy", "heavy rain",
     "(heavy|hvy|excessive|torrential|record).+snow", "heavy snow",
     "snow", "winter weather",
     "hail", "hail",
     "(sleet|freezing)", "sleet",
-    "avalanche", "avalanche",
     "(swell|surf)", "high surf",
     "spout", "waterspout",
     "(coastal storm|surge)", "storm surge/tide",
     "(extreme|severe|heavy|hvy|excessive|torrential|record|unusual).+cold", "extreme cold/wind chill",
     "hypothermia", "extreme cold/wind chill",
     "cold", "cold/wind chill",
-    "record low", "extreme cold/wind chill",
-    "low temperature record", "extreme cold/wind chill",
     "low temperature", "cold/wind chill",
     "(frost|freeze)", "frost/freeze",
     "(tide)", "storm surge/tide",
     "(wave| seas)", "high surf",
-    "smoke", "dense smoke",
     "fire", "wildfire",
     "wint", "winter weather",
-    "(hot|warm).+wet", "excessive heat",
     "(hot|warm)", "heat",
-    "record high", "heat",
-    "high temperature", "excessive heat",
     "(slide|mud|landslump)", "debris flow",
     "avalance", "avalanche",
-    "flash floooding", "flash flood",
+    "flood", "flash flood",
     "(high water|fld|rapidly rising water)", "flood",
-    "dust devel", "dust devil",
     "dust", "dust storm",
-    "ice pellets", "hail",
+    "tropical storm", "tropical storm",
     "(ice|icy|glaze)", "frost/freeze"
 )
 
@@ -72,23 +62,35 @@ allRules = rbind(evTypes, ruleset)
 apply(allRules, 1, function(row) {
     pattern = row[1]   
     evtype = row[2]
-    message(pattern, " - ", evtype)
     matches = grepl(pattern, meaningfulData$normalizedEvtype) & is.na(meaningfulData$event)
+    message(pattern, " -> ", evtype, ": ", sum(matches))
+    
     meaningfulData[matches, "event"] <<- evtype
 })
 
 damageData = meaningfulData[meaningfulData$PROPDMG > 0 | meaningfulData$CROPDMG > 0,]
-damageData = damageData[damageData$PROPDMGEXP %in% c("M", "K") | damageData$CROPDMGEXP %in% c("M", "K"),]
-damageData$PROPDMGEXP = ifelse(damageData$PROPDMGEXP == "K", 1000, damageData$PROPDMGEXP)
-damageData$CROPDMGEXP = ifelse(damageData$CROPDMGEXP == "K", 1000, damageData$CROPDMGEXP)
-damageData$PROPDMGEXP = ifelse(damageData$PROPDMGEXP == "M", 1000000, damageData$PROPDMGEXP)
-damageData$CROPDMGEXP = ifelse(damageData$CROPDMGEXP == "M", 1000000, damageData$CROPDMGEXP)
-damageData$propDmgDollars = damageData$PROPDMGEXP * damageData$PROPDMG
-damageData$cropDmgDollars = damageData$CROPDMGEXP * damageData$CROPDMG
+damageData$PROPDMGEXP = toupper(damageData$PROPDMGEXP)
+damageData$CROPDMGEXP = toupper(damageData$CROPDMGEXP)
+
+
+damageData = damageData[damageData$PROPDMGEXP %in% c("H", "M", "K", "B") | damageData$CROPDMGEXP %in% c("H", "M", "K", "B"),]
+damageData$propMultiplier = 1
+damageData$propMultiplier[damageData$PROPDMGEXP == "H"] = 100
+damageData$propMultiplier[damageData$PROPDMGEXP == "K"] = 1000
+damageData$propMultiplier[damageData$PROPDMGEXP == "M"] = 1000000
+damageData$propMultiplier[damageData$PROPDMGEXP == "B"] = 1000000000
+damageData$cropMultiplier = 1
+damageData$cropMultiplier[damageData$CROPDMGEXP == "H"] = 100
+damageData$cropMultiplier[damageData$CROPDMGEXP == "K"] = 1000
+damageData$cropMultiplier[damageData$CROPDMGEXP == "M"] = 1000000
+damageData$cropMultiplier[damageData$CROPDMGEXP == "B"] = 1000000000
+
+damageData$propDmgDollars = damageData$propMultiplier * damageData$PROPDMG
+damageData$cropDmgDollars = damageData$cropMultiplier * damageData$CROPDMG
 
 uncategorized = damageData[is.na(damageData$event),]
 
-damage = damageData[!is.na(damageData$event), c("propDmgDollars", "cropDmgDollars", "event")]
+damage = damageData[!is.na(damageData$event), c("FATALITIES", "INJURIES", "propDmgDollars", "cropDmgDollars", "event")]
 damage$event = factor(damage$event)
 
 message("uncategorized damage: ", sum(uncategorized$propDmgDollars) + sum(uncategorized$cropDmgDollars))

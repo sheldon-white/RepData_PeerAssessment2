@@ -1,14 +1,15 @@
 library(stringr)
+library(plyr)
 
-#stormData = read.csv("repdata-data-StormData.csv")
-#meaningfulData = stormData[stormData$FATALITIES > 0 | stormData$INJURIES > 0 | stormData$PROPDMG > 0 | stormData$CROPDMG > 0,]
-#meaningfulData$normalizedEvtype = str_trim(tolower(meaningfulData$EVTYPE))
-#meaningfulData$event = NA
+stormData = read.csv("repdata-data-StormData.csv")
+meaningfulData = stormData[stormData$FATALITIES > 0 | stormData$INJURIES > 0 | stormData$PROPDMG > 0 | stormData$CROPDMG > 0,]
+meaningfulData$normalizedEvtype = str_trim(tolower(meaningfulData$EVTYPE))
+meaningfulData$event = NA
 #write.csv(meaningfulData, file = "meaningful.csv")
 
-if (!exists("meaningfulData")) {
-    meaningfulData = read.csv("meaningful.csv")
-}
+#if (!exists("meaningfulData")) {
+#    meaningfulData = read.csv("meaningful.csv")
+#}
 
 evTypes = read.csv("eventtypes.csv", header = FALSE)
 evTypes$V1 = str_trim(tolower(evTypes$V1))
@@ -95,5 +96,12 @@ damage$event = factor(damage$event)
 
 message("uncategorized damage: ", sum(uncategorized$propDmgDollars) + sum(uncategorized$cropDmgDollars))
 message("categorized damage: ", sum(damage$propDmgDollars) + sum(damage$cropDmgDollars))
+
+totals = ddply(damage, .(event), summarize,
+               totalInjuries = sum(INJURIES),
+               totalFatalities = sum(FATALITIES),
+               totalCropDamage = sum(cropDmgDollars),
+               totalPropDamage = sum(propDmgDollars))
+
 
 

@@ -59,17 +59,289 @@ if (window.hljs && document.readyState && document.readyState === "complete") {
 <div id="synopsis" class="section level1">
 <h1>Synopsis</h1>
 <hr />
+<p>It’s well known that severe weather events can have a major impact on municipal well-being; if a tornado touches down in your city, you’re screwed. This report describes the health, material and agricultural damage due to different categories of weather events.</p>
+<p>(describe data source) Data processing was assisted by use of a reference document: “￼NATIONAL WEATHER SERVICE INSTRUCTION 10-1605”, included here as the file “repdata-peer2_doc-pd01016005curr.pdf”. (describe events types, without listing them) (briefly describe challenges and assumptions) (damage numbers adjusted for inflation to 2011 dollar values) (briefly describe results?) <a href="http://oregonstate.edu/cla/polisci/sites/default/files/faculty-research/sahr/inflation-conversion/excel/infcf17742014.xls">http://oregonstate.edu/cla/polisci/sites/default/files/faculty-research/sahr/inflation-conversion/excel/infcf17742014.xls</a></p>
+</div>
+<div id="challenges" class="section level1">
+<h1>Challenges</h1>
+<ul>
+<li>Damage Exponents: These columns (PROPDMGEXP and CROPDMGEXP) represent multipliers for the dollar amounts represnted by the PROPDMG (property damage) and CROPDMG (crop damage) columns. In the end, only “H”, “K”, “M”, “B” were used because their meaning was clear and seemed to be consistent with a sampling of the REMARKS column descriptions. The rows containing numeric PROPDMGEXP and CROPDMGEXP values were ultimately rejected, because inspection of their REMARKS values showed many descriptions that had no relation to the calculated damage values. Also, damage exponents of 12 or 14 (which imply catastrophic dollar amounts) could not be reconciled with the corresponding event descriptions.</li>
+<li>Irregular EVTYPE values: EVTYPE values not matching the 48 baseline values were mapped to the baslie set through inspection and creation of pattern-matching rules. The set of patterns listed here results in the assignment of %99.97 of the data to these 48 values.</li>
+</ul>
 </div>
 <div id="data-processing" class="section level1">
 <h1>Data Processing</h1>
 <hr />
-<div id="assumptions" class="section level3">
-<h3>Assumptions</h3>
-<ul>
-<li>Damage Exponents: only “H”, “K”, “M”, “B” used. Inspection of REMARKS values showed many descriptions that had no relation to the calculated damage values, and damage exponents of 12 or 14 (which imply catastrophic dollar amounts) could not be correlated to the corresponding event descriptions.</li>
-<li>Assigning irregular events type done through inspection, creation of matching rules. Accounts for %99.97 of data.</li>
-</ul>
-</div>
+<p>Load the raw storm data</p>
+<pre class="r"><code>library(stringr)
+library(plyr)
+library(reshape)</code></pre>
+<pre><code>## 
+## Attaching package: 'reshape'
+## 
+## The following objects are masked from 'package:plyr':
+## 
+##     rename, round_any</code></pre>
+<pre class="r"><code>#stormData = read.csv(bzfile(&quot;repdata-data-StormData.csv.bz2&quot;))</code></pre>
+<p>Only retain the records that contain damage, injuries or fatalities.</p>
+<pre class="r"><code>#damageData = stormData[stormData$FATALITIES &gt; 0 | stormData$INJURIES &gt; 0 | stormData$PROPDMG &gt; 0 | stormData$CROPDMG &gt; 0,]
+damageData = read.csv(&quot;meaningful.csv&quot;)</code></pre>
+<p>Load the standard set of event types, prepare for record matching.</p>
+<pre class="r"><code>evTypes = read.csv(&quot;eventtypes.csv&quot;, header = FALSE)
+evTypes$V1 = str_trim(tolower(evTypes$V1))
+evTypes$evtype = evTypes$V1
+colnames(evTypes) = c(&quot;pattern&quot;, &quot;evtype&quot;)
+evTypes$pattern = paste(&quot;^&quot;, evTypes$pattern, &quot;$&quot;, sep=&quot;&quot;)</code></pre>
+<p>Add the additional matching rules.</p>
+<pre class="r"><code>rules = c(  
+    &quot;(typhoon|hurricane)&quot;, &quot;hurricane (typhoon)&quot;,
+    &quot;(wall cloud|micoburst|microburst|downburst|turbulence|thunder|tstm)&quot;, &quot;thunderstorm wind&quot;,
+    &quot;chill&quot;, &quot;extreme cold/wind chill&quot;,  
+    &quot;wind&quot;, &quot;high wind&quot;,   
+    &quot;fog and cold temperatures&quot;, &quot;freezing fog&quot;,
+    &quot;fog&quot;, &quot;dense fog&quot;,
+    &quot;gustnado&quot;, &quot;high wind&quot;,
+    &quot;(tornado|torndao)&quot;, &quot;tornado&quot;,
+    &quot;(ligntning|lighting)&quot;, &quot;lightning&quot;,
+    &quot;(heavy|hvy|excessive|torrential|record).+(rain|rainfall|rainstorm|precipatation|precipitation)&quot;, &quot;heavy rain&quot;,
+    &quot;(shower|rainstorm|rain damage|prolonged rain)&quot;, &quot;heavy rain&quot;,
+    &quot;mixed precipitation&quot;, &quot;heavy rain&quot;,   
+    &quot;(heavy|hvy|excessive|torrential|record).+snow&quot;, &quot;heavy snow&quot;,
+    &quot;snow&quot;, &quot;winter weather&quot;,
+    &quot;hail&quot;, &quot;hail&quot;,
+    &quot;(sleet|freezing)&quot;, &quot;sleet&quot;,
+    &quot;(swell|surf)&quot;, &quot;high surf&quot;,
+    &quot;spout&quot;, &quot;waterspout&quot;,
+    &quot;(coastal storm|surge)&quot;, &quot;storm surge/tide&quot;,
+    &quot;(extreme|severe|heavy|hvy|excessive|torrential|record|unusual).+cold&quot;, &quot;extreme cold/wind chill&quot;,
+    &quot;hypothermia&quot;, &quot;extreme cold/wind chill&quot;,
+    &quot;cold&quot;, &quot;cold/wind chill&quot;,
+    &quot;low temperature&quot;, &quot;cold/wind chill&quot;,
+    &quot;(frost|freeze)&quot;, &quot;frost/freeze&quot;,
+    &quot;(tide)&quot;, &quot;storm surge/tide&quot;,
+    &quot;(wave| seas)&quot;, &quot;high surf&quot;,
+    &quot;fire&quot;, &quot;wildfire&quot;,
+    &quot;wint&quot;, &quot;winter weather&quot;,
+    &quot;(hot|warm)&quot;, &quot;heat&quot;,
+    &quot;(slide|mud|landslump)&quot;, &quot;debris flow&quot;,
+    &quot;avalance&quot;, &quot;avalanche&quot;,
+    &quot;flood&quot;, &quot;flash flood&quot;,
+    &quot;(high water|fld|rapidly rising water)&quot;, &quot;flood&quot;,
+    &quot;dust&quot;, &quot;dust storm&quot;,
+    &quot;tropical storm&quot;, &quot;tropical storm&quot;,
+    &quot;(ice|icy|glaze)&quot;, &quot;frost/freeze&quot;
+)
+
+ruleset = data.frame(matrix(rules, ncol=2, byrow=TRUE))
+colnames(ruleset) = c(&quot;pattern&quot;, &quot;evtype&quot;)
+allRules = rbind(evTypes, ruleset)</code></pre>
+<p>Then assign all records into the 48 docuented categories.</p>
+<pre class="r"><code>damageData$normalizedEvtype = str_trim(tolower(damageData$EVTYPE))
+damageData$event = NA
+apply(allRules, 1, function(row) {
+    pattern = row[1]   
+    evtype = row[2]
+    matches = grepl(pattern, damageData$normalizedEvtype) &amp; is.na(damageData$event)  
+    damageData[matches, &quot;event&quot;] &lt;&lt;- evtype
+})</code></pre>
+<pre><code>##                          1                          2 
+##    &quot;astronomical low tide&quot;                &quot;avalanche&quot; 
+##                          3                          4 
+##                 &quot;blizzard&quot;            &quot;coastal flood&quot; 
+##                          5                          6 
+##          &quot;cold/wind chill&quot;              &quot;debris flow&quot; 
+##                          7                          8 
+##                &quot;dense fog&quot;              &quot;dense smoke&quot; 
+##                          9                         10 
+##                  &quot;drought&quot;               &quot;dust devil&quot; 
+##                         11                         12 
+##               &quot;dust storm&quot;           &quot;excessive heat&quot; 
+##                         13                         14 
+##  &quot;extreme cold/wind chill&quot;              &quot;flash flood&quot; 
+##                         15                         16 
+##                    &quot;flood&quot;             &quot;frost/freeze&quot; 
+##                         17                         18 
+##             &quot;funnel cloud&quot;             &quot;freezing fog&quot; 
+##                         19                         20 
+##                     &quot;hail&quot;                     &quot;heat&quot; 
+##                         21                         22 
+##               &quot;heavy rain&quot;               &quot;heavy snow&quot; 
+##                         23                         24 
+##                &quot;high surf&quot;                &quot;high wind&quot; 
+##                         25                         26 
+##      &quot;hurricane (typhoon)&quot;                &quot;ice storm&quot; 
+##                         27                         28 
+##         &quot;lake-effect snow&quot;          &quot;lakeshore flood&quot; 
+##                         29                         30 
+##                &quot;lightning&quot;              &quot;marine hail&quot; 
+##                         31                         32 
+##         &quot;marine high wind&quot;       &quot;marine strong wind&quot; 
+##                         33                         34 
+## &quot;marine thunderstorm wind&quot;              &quot;rip current&quot; 
+##                         35                         36 
+##                   &quot;seiche&quot;                    &quot;sleet&quot; 
+##                         37                         38 
+##         &quot;storm surge/tide&quot;              &quot;strong wind&quot; 
+##                         39                         40 
+##        &quot;thunderstorm wind&quot;                  &quot;tornado&quot; 
+##                         41                         42 
+##      &quot;tropical depression&quot;           &quot;tropical storm&quot; 
+##                         43                         44 
+##                  &quot;tsunami&quot;             &quot;volcanic ash&quot; 
+##                         45                         46 
+##               &quot;waterspout&quot;                 &quot;wildfire&quot; 
+##                         47                         48 
+##             &quot;winter storm&quot;           &quot;winter weather&quot; 
+##                         49                         50 
+##      &quot;hurricane (typhoon)&quot;        &quot;thunderstorm wind&quot; 
+##                         51                         52 
+##  &quot;extreme cold/wind chill&quot;                &quot;high wind&quot; 
+##                         53                         54 
+##             &quot;freezing fog&quot;                &quot;dense fog&quot; 
+##                         55                         56 
+##                &quot;high wind&quot;                  &quot;tornado&quot; 
+##                         57                         58 
+##                &quot;lightning&quot;               &quot;heavy rain&quot; 
+##                         59                         60 
+##               &quot;heavy rain&quot;               &quot;heavy rain&quot; 
+##                         61                         62 
+##               &quot;heavy snow&quot;           &quot;winter weather&quot; 
+##                         63                         64 
+##                     &quot;hail&quot;                    &quot;sleet&quot; 
+##                         65                         66 
+##                &quot;high surf&quot;               &quot;waterspout&quot; 
+##                         67                         68 
+##         &quot;storm surge/tide&quot;  &quot;extreme cold/wind chill&quot; 
+##                         69                         70 
+##  &quot;extreme cold/wind chill&quot;          &quot;cold/wind chill&quot; 
+##                         71                         72 
+##          &quot;cold/wind chill&quot;             &quot;frost/freeze&quot; 
+##                         73                         74 
+##         &quot;storm surge/tide&quot;                &quot;high surf&quot; 
+##                         75                         76 
+##                 &quot;wildfire&quot;           &quot;winter weather&quot; 
+##                         77                         78 
+##                     &quot;heat&quot;              &quot;debris flow&quot; 
+##                         79                         80 
+##                &quot;avalanche&quot;              &quot;flash flood&quot; 
+##                         81                         82 
+##                    &quot;flood&quot;               &quot;dust storm&quot; 
+##                         83                         84 
+##           &quot;tropical storm&quot;             &quot;frost/freeze&quot;</code></pre>
+<p>Load the inflation adjustment factors; add inflation data to the damageData table.</p>
+<pre class="r"><code>inflationFactors = read.csv(&quot;inflationFactors.csv&quot;, header = FALSE)
+colnames(inflationFactors) = c(&quot;year&quot;, &quot;factor&quot;)
+class(inflationFactors$year) = &quot;integer&quot;
+
+inflation = function(y) {
+    inflationFactors$factor[inflationFactors$year == y]
+}
+
+damageData$year = strptime(damageData$BGN_DATE, &quot;%m/%d/%Y %H:%M:%S&quot;)$year + 1900
+class(damageData$year) = &quot;integer&quot;
+damageData$inflationFactor = as.numeric(lapply(damageData$year, inflation))</code></pre>
+<pre class="r"><code>damageData$PROPDMGEXP = toupper(damageData$PROPDMGEXP)
+damageData$CROPDMGEXP = toupper(damageData$CROPDMGEXP)
+
+damageData = damageData[damageData$PROPDMGEXP %in% c(&quot;H&quot;, &quot;M&quot;, &quot;K&quot;, &quot;B&quot;) | damageData$CROPDMGEXP %in% c(&quot;H&quot;, &quot;M&quot;, &quot;K&quot;, &quot;B&quot;),]
+damageData$propMultiplier = 1
+damageData$propMultiplier[damageData$PROPDMGEXP == &quot;H&quot;] = 100
+damageData$propMultiplier[damageData$PROPDMGEXP == &quot;K&quot;] = 1000
+damageData$propMultiplier[damageData$PROPDMGEXP == &quot;M&quot;] = 1000000
+damageData$propMultiplier[damageData$PROPDMGEXP == &quot;B&quot;] = 1000000000
+damageData$cropMultiplier = 1
+damageData$cropMultiplier[damageData$CROPDMGEXP == &quot;H&quot;] = 100
+damageData$cropMultiplier[damageData$CROPDMGEXP == &quot;K&quot;] = 1000
+damageData$cropMultiplier[damageData$CROPDMGEXP == &quot;M&quot;] = 1000000
+damageData$cropMultiplier[damageData$CROPDMGEXP == &quot;B&quot;] = 1000000000
+
+damageData$propDmgDollars = damageData$propMultiplier * damageData$PROPDMG / damageData$inflationFactor
+damageData$cropDmgDollars = damageData$cropMultiplier * damageData$CROPDMG / damageData$inflationFactor</code></pre>
+<pre class="r"><code>damageData$propDmgDollars = damageData$propMultiplier * damageData$PROPDMG / damageData$inflationFactor
+damageData$cropDmgDollars = damageData$cropMultiplier * damageData$CROPDMG / damageData$inflationFactor
+
+uncategorized = damageData[is.na(damageData$event),]
+
+damage = damageData[!is.na(damageData$event), c(&quot;FATALITIES&quot;, &quot;INJURIES&quot;, &quot;propDmgDollars&quot;, &quot;cropDmgDollars&quot;, &quot;event&quot;)]
+damage$event = factor(damage$event)
+
+message(&quot;uncategorized damage: &quot;, sum(uncategorized$propDmgDollars) + sum(uncategorized$cropDmgDollars))</code></pre>
+<pre><code>## uncategorized damage: 254399252.965303</code></pre>
+<pre class="r"><code>message(&quot;categorized damage: &quot;, sum(damage$propDmgDollars) + sum(damage$cropDmgDollars))</code></pre>
+<pre><code>## categorized damage: 644753714588.105</code></pre>
+<pre class="r"><code>totals = ddply(damage, .(event), summarize,
+               injuries = sum(INJURIES),
+               fatalities = sum(FATALITIES),
+               cropDamage = sum(cropDmgDollars),
+               propDamage = sum(propDmgDollars))
+totals$propDamagePct = 100 * totals$propDamage / sum(totals$propDamage)
+totals$cropDamagePct = 100 * totals$cropDamage / sum(totals$cropDamage)
+totals$injuriesPct = 100 * totals$injuries / sum(totals$injuries)
+totals$fatalitiesPct = 100 * totals$fatalities / sum(totals$fatalities)
+totals$fatalitiesRank = rank(totals$fatalitiesPct)
+totals$injuriesRank = rank(totals$injuriesPct)
+totals$cropDamageRank = rank(totals$cropDamagePct)
+totals$propDamageRank = rank(totals$propDamagePct)
+cutoff = 26
+worstEvents = totals[totals$fatalitiesRank &gt; cutoff &amp;
+                    totals$injuriesRank &gt; cutoff &amp;
+                    totals$cropDamageRank &gt; cutoff &amp;
+                    totals$propDamageRank &gt; cutoff,]
+
+final = worstEvents[,c(&quot;event&quot;,&quot;propDamage&quot;,&quot;cropDamage&quot;,&quot;injuries&quot;,&quot;fatalities&quot;)]
+final = melt(final, id=c(&quot;event&quot;))
+colnames(final)[2] = &quot;category&quot;
+final</code></pre>
+<pre><code>##                  event   category     value
+## 1             blizzard propDamage 9.171e+08
+## 2          flash flood propDamage 2.940e+10
+## 3                flood propDamage 1.635e+11
+## 4           heavy snow propDamage 1.310e+09
+## 5            high wind propDamage 7.437e+09
+## 6  hurricane (typhoon) propDamage 1.022e+11
+## 7          strong wind propDamage 2.000e+08
+## 8    thunderstorm wind propDamage 1.651e+10
+## 9              tornado propDamage 1.414e+11
+## 10      tropical storm propDamage 9.694e+09
+## 11            wildfire propDamage 1.052e+10
+## 12        winter storm propDamage 9.750e+09
+## 13            blizzard cropDamage 1.734e+08
+## 14         flash flood cropDamage 9.756e+09
+## 15               flood cropDamage 6.774e+09
+## 16          heavy snow cropDamage 1.937e+08
+## 17           high wind cropDamage 1.035e+09
+## 18 hurricane (typhoon) cropDamage 6.938e+09
+## 19         strong wind cropDamage 7.432e+07
+## 20   thunderstorm wind cropDamage 1.615e+09
+## 21             tornado cropDamage 5.302e+08
+## 22      tropical storm cropDamage 8.532e+08
+## 23            wildfire cropDamage 4.795e+08
+## 24        winter storm cropDamage 3.998e+07
+## 25            blizzard   injuries 7.780e+02
+## 26         flash flood   injuries 1.578e+03
+## 27               flood   injuries 6.785e+03
+## 28          heavy snow   injuries 7.820e+02
+## 29           high wind   injuries 1.289e+03
+## 30 hurricane (typhoon)   injuries 1.328e+03
+## 31         strong wind   injuries 2.180e+02
+## 32   thunderstorm wind   injuries 5.014e+03
+## 33             tornado   injuries 9.049e+04
+## 34      tropical storm   injuries 3.800e+02
+## 35            wildfire   injuries 1.328e+03
+## 36        winter storm   injuries 1.027e+03
+## 37            blizzard fatalities 7.000e+01
+## 38         flash flood fatalities 7.780e+02
+## 39               flood fatalities 4.140e+02
+## 40          heavy snow fatalities 6.200e+01
+## 41           high wind fatalities 2.060e+02
+## 42 hurricane (typhoon) fatalities 1.090e+02
+## 43         strong wind fatalities 7.700e+01
+## 44   thunderstorm wind fatalities 3.760e+02
+## 45             tornado fatalities 5.591e+03
+## 46      tropical storm fatalities 5.600e+01
+## 47            wildfire fatalities 7.900e+01
+## 48        winter storm fatalities 8.900e+01</code></pre>
+<p>(48 baseline values, in eventtypes.csv) (data loading) (assignment of events) (processing of damage costs) (verifying small # of uncategorized) (describe selection of most damaging event types) (chart creation)</p>
 </div>
 <div id="results" class="section level1">
 <h1>Results</h1>

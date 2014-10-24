@@ -1,27 +1,16 @@
 library(stringr)
 library(plyr)
+library(reshape)
 
-if (!exists("meaningfulData")) {
+if (!exists("damageData")) {
 #    stormData = read.csv(bzfile("repdata-data-StormData.csv.bz2")
-#    meaningfulData = stormData[stormData$FATALITIES > 0 | stormData$INJURIES > 0 | stormData$PROPDMG > 0 | stormData$CROPDMG > 0,]
-#    meaningfulData$normalizedEvtype = str_trim(tolower(meaningfulData$EVTYPE))
-#    meaningfulData$event = NA
-    #write.csv(meaningfulData, file = "meaningful.csv")
+#    damageData = stormData[stormData$FATALITIES > 0 | stormData$INJURIES > 0 | stormData$PROPDMG > 0 | stormData$CROPDMG > 0,]
+#    damageData$normalizedEvtype = str_trim(tolower(damageData$EVTYPE))
+#    damageData$event = NA
+    #write.csv(damageData, file = "meaningful.csv")
 
-    meaningfulData = read.csv("meaningful.csv")
+    damageData = read.csv("meaningful.csv")
 }
-meaningfulData$year = strptime(meaningfulData$BGN_DATE, "%m/%d/%Y %H:%M:%S")$year + 1900
-class(meaningfulData$year) = "integer"
-
-missingYearCount = sum(is.na(meaningfulData$year))
-inflationFactors = read.csv("inflationFactors.csv", header = FALSE)
-colnames(inflationFactors) = c("year", "factor")
-class(inflationFactors$year) = "integer"
-
-inflation = function(y) {
-    inflationFactors$factor[inflationFactors$year == y]
-}
-
 
 evTypes = read.csv("eventtypes.csv", header = FALSE)
 evTypes$V1 = str_trim(tolower(evTypes$V1))
@@ -75,13 +64,22 @@ allRules = rbind(evTypes, ruleset)
 apply(allRules, 1, function(row) {
     pattern = row[1]   
     evtype = row[2]
-    matches = grepl(pattern, meaningfulData$normalizedEvtype) & is.na(meaningfulData$event)
-    message(pattern, " -> ", evtype, ": ", sum(matches))
-    
-    meaningfulData[matches, "event"] <<- evtype
+    matches = grepl(pattern, damageData$normalizedEvtype) & is.na(damageData$event)
+    damageData[matches, "event"] <<- evtype
 })
 
-damageData = meaningfulData[meaningfulData$PROPDMG > 0 | meaningfulData$CROPDMG > 0,]
+damageData$year = strptime(damageData$BGN_DATE, "%m/%d/%Y %H:%M:%S")$year + 1900
+class(damageData$year) = "integer"
+
+inflationFactors = read.csv("inflationFactors.csv", header = FALSE)
+colnames(inflationFactors) = c("year", "factor")
+class(inflationFactors$year) = "integer"
+
+inflation = function(y) {
+    inflationFactors$factor[inflationFactors$year == y]
+}
+damageData$inflationFactor = as.numeric(lapply(damageData$year, inflation))
+
 damageData$PROPDMGEXP = toupper(damageData$PROPDMGEXP)
 damageData$CROPDMGEXP = toupper(damageData$CROPDMGEXP)
 
@@ -97,7 +95,6 @@ damageData$cropMultiplier[damageData$CROPDMGEXP == "K"] = 1000
 damageData$cropMultiplier[damageData$CROPDMGEXP == "M"] = 1000000
 damageData$cropMultiplier[damageData$CROPDMGEXP == "B"] = 1000000000
 
-damageData$inflationFactor = as.numeric(lapply(damageData$year, inflation))
 damageData$propDmgDollars = damageData$propMultiplier * damageData$PROPDMG / damageData$inflationFactor
 damageData$cropDmgDollars = damageData$cropMultiplier * damageData$CROPDMG / damageData$inflationFactor
 
@@ -110,24 +107,35 @@ message("uncategorized damage: ", sum(uncategorized$propDmgDollars) + sum(uncate
 message("categorized damage: ", sum(damage$propDmgDollars) + sum(damage$cropDmgDollars))
 
 totals = ddply(damage, .(event), summarize,
-               totalInjuries = sum(INJURIES),
-               totalFatalities = sum(FATALITIES),
-               totalCropDamage = sum(cropDmgDollars),
-               totalPropDamage = sum(propDmgDollars))
-totals$propDamagePct = 100 * totals$totalPropDamage / sum(totals$totalPropDamage)
-totals$cropDamagePct = 100 * totals$totalCropDamage / sum(totals$totalCropDamage)
-totals$injuriesPct = 100 * totals$totalInjuries / sum(totals$totalInjuries)
-totals$fatalitiesPct = 100 * totals$totalFatalities / sum(totals$totalFatalities)
+               injuries = sum(INJURIES),
+               fatalities = sum(FATALITIES),
+               cropDamage = sum(cropDmgDollars),
+               propDamage = sum(propDmgDollars))
+totals$propDamagePct = 100 * totals$propDamage / sum(totals$propDamage)
+totals$cropDamagePct = 100 * totals$cropDamage / sum(totals$cropDamage)
+totals$injuriesPct = 100 * totals$injuries / sum(totals$injuries)
+totals$fatalitiesPct = 100 * totals$fatalities / sum(totals$fatalities)
 totals$fatalitiesRank = rank(totals$fatalitiesPct)
 totals$injuriesRank = rank(totals$injuriesPct)
 totals$cropDamageRank = rank(totals$cropDamagePct)
 totals$propDamageRank = rank(totals$propDamagePct)
-cutoff = 30
+cutoff = 26
 worstEvents = totals[totals$fatalitiesRank > cutoff &
                     totals$injuriesRank > cutoff &
                     totals$cropDamageRank > cutoff &
                     totals$propDamageRank > cutoff,]
 
+final = worstEvents[,c("event","propDamage","cropDamage","injuries","fatalities")]
+final = melt(final, id=c("event"))
+colnames(final)[2] = "category"
+
+#textTheme = element_text(angle = 90)
+#blankTheme = theme(axis.ticks = element_blank(), axis.text.x = element_blank())
+#p1 = ggplot(worstEvents, aes(y=cropDamage)) + geom_bar(aes(x=event), stat="identity" + blankTheme
+#p2 = ggplot(worstEvents, aes(y=propDamage)) + geom_bar(aes(x=event), stat="identity") + blankTheme
+#p3 = ggplot(worstEvents, aes(y=fatalities)) + geom_bar(aes(x=event), stat="identity") + blankTheme
+#p4 = ggplot(worstEvents, aes(y=injuries)) + geom_bar(aes(x=event), stat="identity") + theme(axis.text = textTheme)
+#p4
 
 
 

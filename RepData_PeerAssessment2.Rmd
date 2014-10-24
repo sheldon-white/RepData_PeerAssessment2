@@ -8,11 +8,22 @@ output:
 
 # Synopsis
 ******
+It's well known that severe weather events can have a major impact on municipal well-being; if a tornado touches down in your city, you're screwed. This report describes the health, material and agricultural damage due to different categories of weather events.
+(describe data source)
+Data processing was assisted by use of a reference document: "￼NATIONAL WEATHER SERVICE INSTRUCTION 10-1605", included here as the file "repdata-peer2_doc-pd01016005curr.pdf".
+(describe events types, without listing them)
+(briefly describe challenges and assumptions)
+(damage numbers not adjusted for inflation)
+(briefly describe results?)
+http://oregonstate.edu/cla/polisci/sites/default/files/faculty-research/sahr/inflation-conversion/excel/infcf17742014.xls
 
+# Challenges
+* Damage Exponents: These columns (PROPDMGEXP and CROPDMGEXP) represent multipliers for the dollar amounts represnted by the PROPDMG (property damage) and CROPDMG (crop damage) columns. In the end, only "H", "K", "M", "B" were used because their meaning was clear and seemed to be consistent with a sampling of the REMARKS column descriptions. The rows containing numeric PROPDMGEXP and CROPDMGEXP values were ultimately rejected, because inspection of their REMARKS values showed many descriptions that had no relation to the calculated damage values. Also, damage exponents of 12 or 14 (which imply catastrophic dollar amounts) could not be reconciled with the corresponding event descriptions.
+* Irregular EVTYPE values: EVTYPE values not matching the 48 baseline values were mapped to the baslie set through inspection and creation of pattern-matching rules. The set of patterns listed here results in the assignment of %99.97 of the data to these 48 values.
 
 # Data Processing
 ******
-Data processing was assisted by use of a reference document: "￼NATIONAL WEATHER SERVICE INSTRUCTION 10-1605", included here as the file "repdata-peer2_doc-pd01016005curr.pdf".
+
 (48 baseline values, in eventtypes.csv)
 (data loading)
 (assignment of events)
@@ -20,9 +31,6 @@ Data processing was assisted by use of a reference document: "￼NATIONAL WEATHE
 (verifying small # of uncategorized)
 (chart creation)
 
-### Assumptions
-* Damage Exponents: These columns (PROPDMGEXP and CROPDMGEXP) represent multipliers for the dollar amounts represnted by the PROPDMG (property damage) and CROPDMG (crop damage) columns. In the end, only "H", "K", "M", "B" were used because their meaning was clear and seemed to be consistent with a sampling of the REMARKS column descriptions. The rows containing numeric PROPDMGEXP and CROPDMGEXP values were ultimately rejected, because inspection of their REMARKS values showed many descriptions that had no relation to the calculated damage values. Also, damage exponents of 12 or 14 (which imply catastrophic dollar amounts) could not be reconciled with the corresponding event descriptions.
-* Irregular EVTYPE values: EVTYPE values not matching the 48 baseline values were mapped to the baslie set through inspection and creation of pattern-matching rules. The set of patterns listed here results in the assignment of %99.97 of the data to these 48 values.
 
 # Results
 ******

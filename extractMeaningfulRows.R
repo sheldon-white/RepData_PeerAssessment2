@@ -1,15 +1,27 @@
 library(stringr)
 library(plyr)
 
-stormData = read.csv("repdata-data-StormData.csv")
-meaningfulData = stormData[stormData$FATALITIES > 0 | stormData$INJURIES > 0 | stormData$PROPDMG > 0 | stormData$CROPDMG > 0,]
-meaningfulData$normalizedEvtype = str_trim(tolower(meaningfulData$EVTYPE))
-meaningfulData$event = NA
-#write.csv(meaningfulData, file = "meaningful.csv")
+if (!exists("meaningfulData")) {
+#    stormData = read.csv(bzfile("repdata-data-StormData.csv.bz2")
+#    meaningfulData = stormData[stormData$FATALITIES > 0 | stormData$INJURIES > 0 | stormData$PROPDMG > 0 | stormData$CROPDMG > 0,]
+#    meaningfulData$normalizedEvtype = str_trim(tolower(meaningfulData$EVTYPE))
+#    meaningfulData$event = NA
+    #write.csv(meaningfulData, file = "meaningful.csv")
 
-#if (!exists("meaningfulData")) {
-#    meaningfulData = read.csv("meaningful.csv")
-#}
+    meaningfulData = read.csv("meaningful.csv")
+}
+meaningfulData$year = strptime(meaningfulData$BGN_DATE, "%m/%d/%Y %H:%M:%S")$year + 1900
+class(meaningfulData$year) = "integer"
+
+missingYearCount = sum(is.na(meaningfulData$year))
+inflationFactors = read.csv("inflationFactors.csv", header = FALSE)
+colnames(inflationFactors) = c("year", "factor")
+class(inflationFactors$year) = "integer"
+
+inflation = function(y) {
+    inflationFactors$factor[inflationFactors$year == y]
+}
+
 
 evTypes = read.csv("eventtypes.csv", header = FALSE)
 evTypes$V1 = str_trim(tolower(evTypes$V1))
@@ -73,7 +85,6 @@ damageData = meaningfulData[meaningfulData$PROPDMG > 0 | meaningfulData$CROPDMG 
 damageData$PROPDMGEXP = toupper(damageData$PROPDMGEXP)
 damageData$CROPDMGEXP = toupper(damageData$CROPDMGEXP)
 
-
 damageData = damageData[damageData$PROPDMGEXP %in% c("H", "M", "K", "B") | damageData$CROPDMGEXP %in% c("H", "M", "K", "B"),]
 damageData$propMultiplier = 1
 damageData$propMultiplier[damageData$PROPDMGEXP == "H"] = 100
@@ -86,8 +97,9 @@ damageData$cropMultiplier[damageData$CROPDMGEXP == "K"] = 1000
 damageData$cropMultiplier[damageData$CROPDMGEXP == "M"] = 1000000
 damageData$cropMultiplier[damageData$CROPDMGEXP == "B"] = 1000000000
 
-damageData$propDmgDollars = damageData$propMultiplier * damageData$PROPDMG
-damageData$cropDmgDollars = damageData$cropMultiplier * damageData$CROPDMG
+damageData$inflationFactor = as.numeric(lapply(damageData$year, inflation))
+damageData$propDmgDollars = damageData$propMultiplier * damageData$PROPDMG / damageData$inflationFactor
+damageData$cropDmgDollars = damageData$cropMultiplier * damageData$CROPDMG / damageData$inflationFactor
 
 uncategorized = damageData[is.na(damageData$event),]
 
@@ -102,6 +114,21 @@ totals = ddply(damage, .(event), summarize,
                totalFatalities = sum(FATALITIES),
                totalCropDamage = sum(cropDmgDollars),
                totalPropDamage = sum(propDmgDollars))
+totals$propDamagePct = 100 * totals$totalPropDamage / sum(totals$totalPropDamage)
+totals$cropDamagePct = 100 * totals$totalCropDamage / sum(totals$totalCropDamage)
+totals$injuriesPct = 100 * totals$totalInjuries / sum(totals$totalInjuries)
+totals$fatalitiesPct = 100 * totals$totalFatalities / sum(totals$totalFatalities)
+totals$fatalitiesRank = rank(totals$fatalitiesPct)
+totals$injuriesRank = rank(totals$injuriesPct)
+totals$cropDamageRank = rank(totals$cropDamagePct)
+totals$propDamageRank = rank(totals$propDamagePct)
+cutoff = 30
+worstEvents = totals[totals$fatalitiesRank > cutoff &
+                    totals$injuriesRank > cutoff &
+                    totals$cropDamageRank > cutoff &
+                    totals$propDamageRank > cutoff,]
+
+
 
 
 

@@ -11,9 +11,12 @@ if (!exists("damageData")) {
     #write.csv(damageData, file = "meaningful.csv")
     
     
-    damageData = read.csv("meaningful.csv")
-    damageData = damageData[,c("FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP", "BGN_DATE", "EVTYPE")]
-    damageData = damageData[damageData$PROPDMGEXP %in% c("H", "M", "K", "B") | damageData$CROPDMGEXP %in% c("H", "M", "K", "B"),]    
+    rawDamageData = read.csv("meaningful.csv")
+    damageData = rawDamageData[,c("FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP", "BGN_DATE", "EVTYPE")]
+    damageData = damageData[damageData$INJURIES > 0 |
+                            damageData$FATALITIES > 0 |
+                            damageData$PROPDMGEXP %in% c("H", "M", "K", "B") |
+                            damageData$CROPDMGEXP %in% c("H", "M", "K", "B"),]
 }
 
 evTypes = read.csv("eventtypes.csv", header = FALSE)
@@ -105,7 +108,7 @@ damageData$cropDmgDollars = damageData$cropMultiplier * damageData$CROPDMG / dam
 
 uncategorized = damageData[is.na(damageData$event),]
 
-damage = damageData[!is.na(damageData$event), c("FATALITIES", "INJURIES", "propDmgDollars", "cropDmgDollars", "event")]
+damage = damageData[!is.na(damageData$event), c("year", "FATALITIES", "INJURIES", "propDmgDollars", "cropDmgDollars", "event")]
 damage$event = factor(damage$event)
 
 message("uncategorized damage: ", sum(uncategorized$propDmgDollars) + sum(uncategorized$cropDmgDollars))
@@ -123,9 +126,9 @@ totals$fatalitiesPct = 100 * totals$fatalities / sum(totals$fatalities)
 
 damageEvents = totals[,c("event","propDamage", "propDamagePct", "cropDamage", "cropDamagePct")]
 healthEvents = totals[,c("event","injuries", "injuriesPct", "fatalities", "fatalitiesPct")]
-worstDamageEvents = damageEvents[damageEvents$propDamagePct > 1 & damageEvents$cropDamagePct > 1, c("event","propDamage", "cropDamage")]
+worstDamageEvents = damageEvents[damageEvents$propDamagePct > 2 | damageEvents$cropDamagePct > 2, c("event","propDamage", "cropDamage")]
 colnames(worstDamageEvents)[2:3] = c("Property Damage", "Crop Damage")
-worstHealthEvents = healthEvents[healthEvents$injuriesPct > 1 & healthEvents$fatalitiesPct > 1, c("event","injuries", "fatalities")]
+worstHealthEvents = healthEvents[healthEvents$injuriesPct > 2 & healthEvents$fatalitiesPct > 2, c("event","injuries", "fatalities")]
 colnames(worstHealthEvents)[2:3] = c("Injuries", "Fatalities")
 
 damageCollated = melt(worstDamageEvents, id=c("event"))
@@ -139,3 +142,14 @@ ggplot(damageCollated, aes(event, value)) +
 ggplot(healthCollated, aes(event, value)) +
     geom_bar(aes(fill = category), position = "dodge", stat="identity") + coord_flip() +
     xlab("Event Type") + ylab("Number of Affected People")
+
+subset = damage[damage$event %in% c("tornado", "flood", "hurricane (typhoon)", "thunderstorm wind"),]
+totals = ddply(subset, c("event", "year"), summarize,
+               injuries = sum(INJURIES),
+               fatalities = sum(FATALITIES),
+               cropDamage = sum(cropDmgDollars),
+               propDamage = sum(propDmgDollars))
+totalsMelted = melt(totals, id=c("event", "year"))
+ggplot(data=totalsMelted, aes(x=year, y = value, colour = event, group = event)) + 
+    geom_line() + facet_wrap(~variable, scales = "free")
+

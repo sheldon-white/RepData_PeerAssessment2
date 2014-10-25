@@ -1,30 +1,22 @@
-# RepData Project 2: The Impact of Weather Events on Property and Crop Damage in the US
+# RepData Project 2: Damage and Health Effects of Weather Events: 1950 - 2011
 
-
+******
 # Synopsis
 ******
-It's well known that severe weather events can have a major impact on municipal well-being; if a tornado touches down in your city, you're screwed. This report extracts the primary weather types contributing to agricultural, physical and health damage in the US between 1950 and 2011.
-
-(describe data source)
-Data processing was assisted by use of a reference document: "￼NATIONAL WEATHER SERVICE INSTRUCTION 10-1605", included here as the file "repdata-peer2_doc-pd01016005curr.pdf".
-(describe events types, without listing them)
-(describe the discovery of the event types that are the major contributors to health and damage figures)
-
+It's well known that severe weather events can have a major impact on municipal well-being; if a tornado touches down in your city, you're screwed. This report extracts and presents the primary weather types contributing to agricultural, physical and health damage in the US between 1950 and 2011.
+This source data was a dump of NOAA storm events database (http://www.ncdc.noaa.gov/stormevents/) from 1950 to 2011. Data processing was assisted by use of a reference document: "￼NATIONAL WEATHER SERVICE INSTRUCTION 10-1605", included here as the file "repdata-peer2_doc-pd01016005curr.pdf". This documents groups all weather events into a set of 48 categories, but many of the EVTYPE records in the database did not match this set. Much of the work preparing this report was creating a set of patterns that could be applied to coerce all records into these 48 categories.
+After assignment to events types, the data corresponding to events with significant impact (here defined as contributing greater than two percent to the total damage value) are extracted and plotted by event type.
 All supporting data files, documents and source code can be found at: https://github.com/sheldon-white/RepData_PeerAssessment2
 
 # Challenges
-* Unclear data description: There isn't a "proper" databook suuplied for this dataset. The included PDF file provides general descriptions of the data but in the end it was necessary to make assumptions in interpreting the data. 
-* Damage exponents: These columns (PROPDMGEXP and CROPDMGEXP) represent multipliers for the dollar amounts represnted by the PROPDMG (property damage) and CROPDMG (crop damage) columns. In the end, only "H", "K", "M", "B" were used because their meaning was fairly clear (after internet research) and seemed to be consistent with a sampling of the REMARKS column descriptions. The rows containing numeric PROPDMGEXP and CROPDMGEXP values were ultimately rejected, because inspection of their REMARKS values showed many descriptions that had no relation to the calculated damage values. For instance, damage exponents of 12 or 14 (which imply catastrophic dollar amounts) could not be reconciled with the corresponding event descriptions.
-* Irregular EVTYPE values: EVTYPE values not matching the 48 official categories were mapped to these categories through inspection, trial and error, and creation of pattern-matching rules. The set of patterns listed here results in the assignment of %99.97 of the data to these 48 values.
-* Inflation
-Damage values are inflation-adjusted to 2011 values using conversion factors extracted from data compied at the Oregon State Political Science department:
-http://oregonstate.edu/cla/polisci/sites/default/files/faculty-research/sahr/inflation-conversion/excel/infcf17742014.xls.
-Values A(210) - A(271) and T(210) - T(271) were extracted from this Excel file to create inflationFactors.csv. These numbers represent the number of old dollars equivalent to a 2011 dollar. (For example: 0.107 1950 dollars == one 2011 dollar.) The reported weather damage values are divided by these conversion values to obtain the equivalent 2011 damage values.
+* **Unclear data description:** There isn't a "proper" databook supplied for this dataset. The included PDF file provides general descriptions of the data but in the end it was necessary to make assumptions in interpreting the data. 
+* **Damage exponents:** These columns (PROPDMGEXP and CROPDMGEXP) represent multipliers for the dollar amounts represented by the PROPDMG (property damage) and CROPDMG (crop damage) columns. In the end, only "H", "K", "M", "B" were used because their meaning was fairly clear (after internet research) and seemed to be consistent with a sampling of the REMARKS column descriptions. The rows containing numeric PROPDMGEXP and CROPDMGEXP values were ultimately rejected, because inspection of their REMARKS values showed many descriptions that had no relation to the calculated damage values. For instance, damage exponents of 12 or 14 (which imply catastrophic dollar amounts) could not be reconciled with the corresponding event descriptions.
+* **Irregular EVTYPE values:** EVTYPE values not matching the 48 official categories were mapped to these categories through inspection, trial and error, and creation of pattern-matching rules. The set of patterns listed here results in the assignment of %99.97 of the data to these 48 values.
+* **Inflation:** Damage values were inflation-adjusted to 2011 values using conversion factors extracted from data compiled at the Oregon State Political Science department: http://oregonstate.edu/cla/polisci/sites/default/files/faculty-research/sahr/inflation-conversion/excel/infcf17742014.xls. Values A(210) - A(271) and T(210) - T(271) were extracted from this Excel file to create inflationFactors.csv. These numbers represent the number of old dollars equivalent to a 2011 dollar. (For example: 0.107 1950 dollars == one 2011 dollar.) The reported weather damage values are divided by these conversion values to obtain the equivalent 2011 damage values.
 
 
 # Data Processing
 ******
-
 Load the raw storm data
 
 ```r
@@ -44,16 +36,16 @@ library(reshape)
 
 ```r
 library(ggplot2)
-#stormData = read.csv(bzfile("repdata-data-StormData.csv.bz2"))
+stormData = read.csv(bzfile("repdata-data-StormData.csv.bz2"))
 ```
 Only retain the rows that contain damage, injuries or fatalities. We can also discard most of the columns.
 
 ```r
-#damageData = stormData[stormData$FATALITIES > 0 | stormData$INJURIES > 0 | stormData$PROPDMG > 0 | stormData$CROPDMG > 0,]
-damageData = read.csv("meaningful.csv")
-damageData = damageData[,c("FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP", "BGN_DATE", "EVTYPE")]
-
-damageData = damageData[damageData$PROPDMGEXP %in% c("H", "M", "K", "B") | damageData$CROPDMGEXP %in% c("H", "M", "K", "B"),]
+damageData = stormData[,c("FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP", "BGN_DATE", "EVTYPE")]
+damageData = damageData[damageData$INJURIES > 0 |
+                        damageData$FATALITIES > 0 |
+                        damageData$PROPDMGEXP %in% c("H", "M", "K", "B") |
+                        damageData$CROPDMGEXP %in% c("H", "M", "K", "B"),]
 ```
 Load the standard set of event types, convert to patterns for exact matching. For convenience, all patterns are matched using regular expressions in a single pass.
 
@@ -139,12 +131,11 @@ damageData$year = strptime(damageData$BGN_DATE, "%m/%d/%Y %H:%M:%S")$year + 1900
 class(damageData$year) = "integer"
 damageData$inflationFactor = as.numeric(lapply(damageData$year, inflation))
 ```
-Now convert the damage cost records into a useable form, scaling them with the damage exponents and the inflation factor.
+Now convert the damage cost records into a usable form, scaling them with the damage exponents and the inflation factor.
 
 ```r
 damageData$PROPDMGEXP = toupper(damageData$PROPDMGEXP)
 damageData$CROPDMGEXP = toupper(damageData$CROPDMGEXP)
-
 
 damageData$propMultiplier = 1
 damageData$propMultiplier[damageData$PROPDMGEXP == "H"] = 100
@@ -163,7 +154,7 @@ damageData$cropDmgDollars = damageData$cropMultiplier * damageData$CROPDMG / dam
 Extract the minimum set of columns for data visualization, reshape the data into a final format. We separate damage values from health values at this point.
 
 ```r
-damage = damageData[!is.na(damageData$event), c("FATALITIES", "INJURIES", "propDmgDollars", "cropDmgDollars", "event")]
+damage = damageData[!is.na(damageData$event), c("year", "FATALITIES", "INJURIES", "propDmgDollars", "cropDmgDollars", "event")]
 damage$event = factor(damage$event)
 
 totals = ddply(damage, .(event), summarize,
@@ -172,7 +163,7 @@ totals = ddply(damage, .(event), summarize,
                cropDamage = sum(cropDmgDollars),
                propDamage = sum(propDmgDollars))
 ```
-We calculate the relative contributions of each event type to it's category. We will discard all event types with little impact.
+We calculate the relative contributions of each event type to it's category (needed a little later).
 
 ```r
 totals$propDamagePct = 100 * totals$propDamage / sum(totals$propDamage)
@@ -200,7 +191,7 @@ message("uncategorized row count: ", nrow(uncategorized))
 ```
 
 ```
-## uncategorized row count: 82
+## uncategorized row count: 353
 ```
 
 ```r
@@ -216,19 +207,16 @@ message("categorized damage: ", sum(damage$propDmgDollars) + sum(damage$cropDmgD
 ```
 
 ```
-## categorized damage: 644681547866.381
+## categorized damage: 644696297326.406
 ```
-
-# Results
-******
-We only retain events that are a significant contributor (> %1) to the damage and health totals. 
+For the first two plots we only retain events that are a significant contributor (> %2) to the damage and health totals. 
 
 ```r
 damageEvents = totals[,c("event","propDamage", "propDamagePct", "cropDamage", "cropDamagePct")]
 healthEvents = totals[,c("event","injuries", "injuriesPct", "fatalities", "fatalitiesPct")]
-worstDamageEvents = damageEvents[damageEvents$propDamagePct > 1 & damageEvents$cropDamagePct > 1, c("event","propDamage", "cropDamage")]
+worstDamageEvents = damageEvents[damageEvents$propDamagePct > 2 | damageEvents$cropDamagePct > 2, c("event","propDamage", "cropDamage")]
 colnames(worstDamageEvents)[2:3] = c("Property Damage", "Crop Damage")
-worstHealthEvents = healthEvents[healthEvents$injuriesPct > 1 & healthEvents$fatalitiesPct > 1, c("event","injuries", "fatalities")]
+worstHealthEvents = healthEvents[healthEvents$injuriesPct > 2 | healthEvents$fatalitiesPct > 2, c("event","injuries", "fatalities")]
 colnames(worstHealthEvents)[2:3] = c("Injuries", "Fatalities")
 
 damageCollated = melt(worstDamageEvents, id=c("event"))
@@ -236,18 +224,37 @@ healthCollated = melt(worstHealthEvents, id=c("event"))
 colnames(damageCollated)[2] = "category"
 colnames(healthCollated)[2] = "category"
 damageCollated$value = damageCollated$value / 1000000
+```
+# Results
+******
 
+
+```r
 ggplot(damageCollated, aes(event, value)) +
     geom_bar(aes(fill = category), position = "dodge", stat = "identity") + coord_flip() +
-    xlab("Event Type") + ylab("Total Damage (Millons of Dollars)")
+    xlab("Event Type") + ylab("Total Damage (Millons of Dollars)") + ggtitle("Damage Totals in US (1950 - 2011)\n")
 ```
 
-![plot of chunk create-plots](./RepData_PeerAssessment2_files/figure-html/create-plots1.png) 
+![plot of chunk event-damage](./RepData_PeerAssessment2_files/figure-html/event-damage.png) 
 
 ```r
 ggplot(healthCollated, aes(event, value)) +
     geom_bar(aes(fill = category), position = "dodge", stat="identity") + coord_flip() +
-    xlab("Event Type") + ylab("Number of Affected People")
+    xlab("Event Type") + ylab("Number of Affected People") + ggtitle("Injury and Fatality Totals in US (1950 - 2011)\n")
 ```
 
-![plot of chunk create-plots](./RepData_PeerAssessment2_files/figure-html/create-plots2.png) 
+![plot of chunk event-injury](./RepData_PeerAssessment2_files/figure-html/event-injury.png) 
+
+```r
+subset = damage[damage$event %in% c("tornado", "flood", "hurricane (typhoon)", "thunderstorm wind"),]
+totals = ddply(subset, c("event", "year"), summarize,
+               injuries = sum(INJURIES),
+               fatalities = sum(FATALITIES),
+               cropDamage = sum(cropDmgDollars),
+               propDamage = sum(propDmgDollars))
+totalsMelted = melt(totals, id=c("event", "year"))
+ggplot(data=totalsMelted, aes(x=year, y = value, colour = event, group = event)) + 
+    geom_line() + facet_wrap(~variable, scales = "free")
+```
+
+![plot of chunk major-events-by-year](./RepData_PeerAssessment2_files/figure-html/major-events-by-year.png) 

@@ -1,15 +1,19 @@
 library(stringr)
 library(plyr)
 library(reshape)
+library(ggplot2)
 
 if (!exists("damageData")) {
-#    stormData = read.csv(bzfile("repdata-data-StormData.csv.bz2")
-#    damageData = stormData[stormData$FATALITIES > 0 | stormData$INJURIES > 0 | stormData$PROPDMG > 0 | stormData$CROPDMG > 0,]
-#    damageData$normalizedEvtype = str_trim(tolower(damageData$EVTYPE))
-#    damageData$event = NA
+    #stormData = read.csv(bzfile("repdata-data-StormData.csv.bz2"))
+    #damageData = stormData[stormData$FATALITIES > 0 | stormData$INJURIES > 0 | stormData$PROPDMG > 0 | stormData$CROPDMG > 0,]
+    #damageData$normalizedEvtype = str_trim(tolower(damageData$EVTYPE))
+    #damageData$event = NA
     #write.csv(damageData, file = "meaningful.csv")
-
+    
+    
     damageData = read.csv("meaningful.csv")
+    damageData = damageData[,c("FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP", "BGN_DATE", "EVTYPE")]
+    damageData = damageData[damageData$PROPDMGEXP %in% c("H", "M", "K", "B") | damageData$CROPDMGEXP %in% c("H", "M", "K", "B"),]    
 }
 
 evTypes = read.csv("eventtypes.csv", header = FALSE)
@@ -60,6 +64,8 @@ rules = c(
 ruleset = data.frame(matrix(rules, ncol=2, byrow=TRUE))
 colnames(ruleset) = c("pattern", "evtype")
 allRules = rbind(evTypes, ruleset)
+damageData$normalizedEvtype = str_trim(tolower(damageData$EVTYPE))
+damageData$event = NA
 
 apply(allRules, 1, function(row) {
     pattern = row[1]   
@@ -83,7 +89,6 @@ damageData$inflationFactor = as.numeric(lapply(damageData$year, inflation))
 damageData$PROPDMGEXP = toupper(damageData$PROPDMGEXP)
 damageData$CROPDMGEXP = toupper(damageData$CROPDMGEXP)
 
-damageData = damageData[damageData$PROPDMGEXP %in% c("H", "M", "K", "B") | damageData$CROPDMGEXP %in% c("H", "M", "K", "B"),]
 damageData$propMultiplier = 1
 damageData$propMultiplier[damageData$PROPDMGEXP == "H"] = 100
 damageData$propMultiplier[damageData$PROPDMGEXP == "K"] = 1000
@@ -115,28 +120,22 @@ totals$propDamagePct = 100 * totals$propDamage / sum(totals$propDamage)
 totals$cropDamagePct = 100 * totals$cropDamage / sum(totals$cropDamage)
 totals$injuriesPct = 100 * totals$injuries / sum(totals$injuries)
 totals$fatalitiesPct = 100 * totals$fatalities / sum(totals$fatalities)
-totals$fatalitiesRank = rank(totals$fatalitiesPct)
-totals$injuriesRank = rank(totals$injuriesPct)
-totals$cropDamageRank = rank(totals$cropDamagePct)
-totals$propDamageRank = rank(totals$propDamagePct)
-cutoff = 26
-worstEvents = totals[totals$fatalitiesRank > cutoff &
-                    totals$injuriesRank > cutoff &
-                    totals$cropDamageRank > cutoff &
-                    totals$propDamageRank > cutoff,]
 
-final = worstEvents[,c("event","propDamage","cropDamage","injuries","fatalities")]
-final = melt(final, id=c("event"))
-colnames(final)[2] = "category"
+damageEvents = totals[,c("event","propDamage", "propDamagePct", "cropDamage", "cropDamagePct")]
+healthEvents = totals[,c("event","injuries", "injuriesPct", "fatalities", "fatalitiesPct")]
+worstDamageEvents = damageEvents[damageEvents$propDamagePct > 1 & damageEvents$cropDamagePct > 1, c("event","propDamage", "cropDamage")]
+colnames(worstDamageEvents)[2:3] = c("Property Damage", "Crop Damage")
+worstHealthEvents = healthEvents[healthEvents$injuriesPct > 1 & healthEvents$fatalitiesPct > 1, c("event","injuries", "fatalities")]
+colnames(worstHealthEvents)[2:3] = c("Injuries", "Fatalities")
 
-#textTheme = element_text(angle = 90)
-#blankTheme = theme(axis.ticks = element_blank(), axis.text.x = element_blank())
-#p1 = ggplot(worstEvents, aes(y=cropDamage)) + geom_bar(aes(x=event), stat="identity" + blankTheme
-#p2 = ggplot(worstEvents, aes(y=propDamage)) + geom_bar(aes(x=event), stat="identity") + blankTheme
-#p3 = ggplot(worstEvents, aes(y=fatalities)) + geom_bar(aes(x=event), stat="identity") + blankTheme
-#p4 = ggplot(worstEvents, aes(y=injuries)) + geom_bar(aes(x=event), stat="identity") + theme(axis.text = textTheme)
-#p4
-
-
-
-
+damageCollated = melt(worstDamageEvents, id=c("event"))
+healthCollated = melt(worstHealthEvents, id=c("event"))
+colnames(damageCollated)[2] = "category"
+colnames(healthCollated)[2] = "category"
+damageCollated$value = damageCollated$value / 1000000
+ggplot(damageCollated, aes(event, value)) +
+    geom_bar(aes(fill = category), position = "dodge", stat = "identity") + coord_flip() +
+    xlab("Event Type") + ylab("Total Damage (Millons of Dollars)")
+ggplot(healthCollated, aes(event, value)) +
+    geom_bar(aes(fill = category), position = "dodge", stat="identity") + coord_flip() +
+    xlab("Event Type") + ylab("Number of Affected People")

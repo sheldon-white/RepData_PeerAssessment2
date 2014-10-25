@@ -3,22 +3,28 @@
 
 # Synopsis
 ******
-It's well known that severe weather events can have a major impact on municipal well-being; if a tornado touches down in your city, you're screwed. This report describes the health, material and agricultural damage due to different categories of weather events.
+It's well known that severe weather events can have a major impact on municipal well-being; if a tornado touches down in your city, you're screwed. This report extracts the primary weather types contributing to agricultural, physical and health damage in the US between 1950 and 2011.
 
 (describe data source)
 Data processing was assisted by use of a reference document: "￼NATIONAL WEATHER SERVICE INSTRUCTION 10-1605", included here as the file "repdata-peer2_doc-pd01016005curr.pdf".
 (describe events types, without listing them)
-(briefly describe challenges and assumptions)
-(damage numbers adjusted for inflation to 2011 dollar values)
-(briefly describe results?)
-http://oregonstate.edu/cla/polisci/sites/default/files/faculty-research/sahr/inflation-conversion/excel/infcf17742014.xls
+(describe the discovery of the event types that are the major contributors to health and damage figures)
+
+All supporting data files, documents and source code can be found at: https://github.com/sheldon-white/RepData_PeerAssessment2
 
 # Challenges
-* Damage Exponents: These columns (PROPDMGEXP and CROPDMGEXP) represent multipliers for the dollar amounts represnted by the PROPDMG (property damage) and CROPDMG (crop damage) columns. In the end, only "H", "K", "M", "B" were used because their meaning was clear and seemed to be consistent with a sampling of the REMARKS column descriptions. The rows containing numeric PROPDMGEXP and CROPDMGEXP values were ultimately rejected, because inspection of their REMARKS values showed many descriptions that had no relation to the calculated damage values. Also, damage exponents of 12 or 14 (which imply catastrophic dollar amounts) could not be reconciled with the corresponding event descriptions.
-* Irregular EVTYPE values: EVTYPE values not matching the 48 baseline values were mapped to the baslie set through inspection and creation of pattern-matching rules. The set of patterns listed here results in the assignment of %99.97 of the data to these 48 values.
+* Unclear data description: There isn't a "proper" databook suuplied for this dataset. The included PDF file provides general descriptions of the data but in the end it was necessary to make assumptions in interpreting the data. 
+* Damage exponents: These columns (PROPDMGEXP and CROPDMGEXP) represent multipliers for the dollar amounts represnted by the PROPDMG (property damage) and CROPDMG (crop damage) columns. In the end, only "H", "K", "M", "B" were used because their meaning was fairly clear (after internet research) and seemed to be consistent with a sampling of the REMARKS column descriptions. The rows containing numeric PROPDMGEXP and CROPDMGEXP values were ultimately rejected, because inspection of their REMARKS values showed many descriptions that had no relation to the calculated damage values. For instance, damage exponents of 12 or 14 (which imply catastrophic dollar amounts) could not be reconciled with the corresponding event descriptions.
+* Irregular EVTYPE values: EVTYPE values not matching the 48 official categories were mapped to these categories through inspection, trial and error, and creation of pattern-matching rules. The set of patterns listed here results in the assignment of %99.97 of the data to these 48 values.
+* Inflation
+Damage values are inflation-adjusted to 2011 values using conversion factors extracted from data compied at the Oregon State Political Science department:
+http://oregonstate.edu/cla/polisci/sites/default/files/faculty-research/sahr/inflation-conversion/excel/infcf17742014.xls.
+Values A(210) - A(271) and T(210) - T(271) were extracted from this Excel file to create inflationFactors.csv. These numbers represent the number of old dollars equivalent to a 2011 dollar. (For example: 0.107 1950 dollars == one 2011 dollar.) The reported weather damage values are divided by these conversion values to obtain the equivalent 2011 damage values.
+
 
 # Data Processing
 ******
+
 Load the raw storm data
 
 ```r
@@ -37,15 +43,19 @@ library(reshape)
 ```
 
 ```r
+library(ggplot2)
 #stormData = read.csv(bzfile("repdata-data-StormData.csv.bz2"))
 ```
-Only retain the records that contain damage, injuries or fatalities.
+Only retain the rows that contain damage, injuries or fatalities. We can also discard most of the columns.
 
 ```r
 #damageData = stormData[stormData$FATALITIES > 0 | stormData$INJURIES > 0 | stormData$PROPDMG > 0 | stormData$CROPDMG > 0,]
 damageData = read.csv("meaningful.csv")
+damageData = damageData[,c("FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP", "BGN_DATE", "EVTYPE")]
+
+damageData = damageData[damageData$PROPDMGEXP %in% c("H", "M", "K", "B") | damageData$CROPDMGEXP %in% c("H", "M", "K", "B"),]
 ```
-Load the standard set of event types, prepare for record matching.
+Load the standard set of event types, convert to patterns for exact matching. For convenience, all patterns are matched using regular expressions in a single pass.
 
 ```r
 evTypes = read.csv("eventtypes.csv", header = FALSE)
@@ -55,7 +65,7 @@ colnames(evTypes) = c("pattern", "evtype")
 evTypes$pattern = paste("^", evTypes$pattern, "$", sep="")
 ```
 
-Add the additional matching rules.
+Add the additional matching regular expressions. These are pairs of (pattern, standard-event) strings.
 
 ```r
 rules = c(  
@@ -102,104 +112,17 @@ colnames(ruleset) = c("pattern", "evtype")
 allRules = rbind(evTypes, ruleset)
 ```
 
-Then assign all records into the 48 docuented categories.
+Then assign all possible records into the official categories.
 
 ```r
 damageData$normalizedEvtype = str_trim(tolower(damageData$EVTYPE))
 damageData$event = NA
-apply(allRules, 1, function(row) {
+a = apply(allRules, 1, function(row) {
     pattern = row[1]   
     evtype = row[2]
     matches = grepl(pattern, damageData$normalizedEvtype) & is.na(damageData$event)  
     damageData[matches, "event"] <<- evtype
 })
-```
-
-```
-##                          1                          2 
-##    "astronomical low tide"                "avalanche" 
-##                          3                          4 
-##                 "blizzard"            "coastal flood" 
-##                          5                          6 
-##          "cold/wind chill"              "debris flow" 
-##                          7                          8 
-##                "dense fog"              "dense smoke" 
-##                          9                         10 
-##                  "drought"               "dust devil" 
-##                         11                         12 
-##               "dust storm"           "excessive heat" 
-##                         13                         14 
-##  "extreme cold/wind chill"              "flash flood" 
-##                         15                         16 
-##                    "flood"             "frost/freeze" 
-##                         17                         18 
-##             "funnel cloud"             "freezing fog" 
-##                         19                         20 
-##                     "hail"                     "heat" 
-##                         21                         22 
-##               "heavy rain"               "heavy snow" 
-##                         23                         24 
-##                "high surf"                "high wind" 
-##                         25                         26 
-##      "hurricane (typhoon)"                "ice storm" 
-##                         27                         28 
-##         "lake-effect snow"          "lakeshore flood" 
-##                         29                         30 
-##                "lightning"              "marine hail" 
-##                         31                         32 
-##         "marine high wind"       "marine strong wind" 
-##                         33                         34 
-## "marine thunderstorm wind"              "rip current" 
-##                         35                         36 
-##                   "seiche"                    "sleet" 
-##                         37                         38 
-##         "storm surge/tide"              "strong wind" 
-##                         39                         40 
-##        "thunderstorm wind"                  "tornado" 
-##                         41                         42 
-##      "tropical depression"           "tropical storm" 
-##                         43                         44 
-##                  "tsunami"             "volcanic ash" 
-##                         45                         46 
-##               "waterspout"                 "wildfire" 
-##                         47                         48 
-##             "winter storm"           "winter weather" 
-##                         49                         50 
-##      "hurricane (typhoon)"        "thunderstorm wind" 
-##                         51                         52 
-##  "extreme cold/wind chill"                "high wind" 
-##                         53                         54 
-##             "freezing fog"                "dense fog" 
-##                         55                         56 
-##                "high wind"                  "tornado" 
-##                         57                         58 
-##                "lightning"               "heavy rain" 
-##                         59                         60 
-##               "heavy rain"               "heavy rain" 
-##                         61                         62 
-##               "heavy snow"           "winter weather" 
-##                         63                         64 
-##                     "hail"                    "sleet" 
-##                         65                         66 
-##                "high surf"               "waterspout" 
-##                         67                         68 
-##         "storm surge/tide"  "extreme cold/wind chill" 
-##                         69                         70 
-##  "extreme cold/wind chill"          "cold/wind chill" 
-##                         71                         72 
-##          "cold/wind chill"             "frost/freeze" 
-##                         73                         74 
-##         "storm surge/tide"                "high surf" 
-##                         75                         76 
-##                 "wildfire"           "winter weather" 
-##                         77                         78 
-##                     "heat"              "debris flow" 
-##                         79                         80 
-##                "avalanche"              "flash flood" 
-##                         81                         82 
-##                    "flood"               "dust storm" 
-##                         83                         84 
-##           "tropical storm"             "frost/freeze"
 ```
 Load the inflation adjustment factors; add inflation data to the damageData table.
 
@@ -216,13 +139,13 @@ damageData$year = strptime(damageData$BGN_DATE, "%m/%d/%Y %H:%M:%S")$year + 1900
 class(damageData$year) = "integer"
 damageData$inflationFactor = as.numeric(lapply(damageData$year, inflation))
 ```
-
+Now convert the damage cost records into a useable form, scaling them with the damage exponents and the inflation factor.
 
 ```r
 damageData$PROPDMGEXP = toupper(damageData$PROPDMGEXP)
 damageData$CROPDMGEXP = toupper(damageData$CROPDMGEXP)
 
-damageData = damageData[damageData$PROPDMGEXP %in% c("H", "M", "K", "B") | damageData$CROPDMGEXP %in% c("H", "M", "K", "B"),]
+
 damageData$propMultiplier = 1
 damageData$propMultiplier[damageData$PROPDMGEXP == "H"] = 100
 damageData$propMultiplier[damageData$PROPDMGEXP == "K"] = 1000
@@ -237,17 +160,50 @@ damageData$cropMultiplier[damageData$CROPDMGEXP == "B"] = 1000000000
 damageData$propDmgDollars = damageData$propMultiplier * damageData$PROPDMG / damageData$inflationFactor
 damageData$cropDmgDollars = damageData$cropMultiplier * damageData$CROPDMG / damageData$inflationFactor
 ```
-
+Extract the minimum set of columns for data visualization, reshape the data into a final format. We separate damage values from health values at this point.
 
 ```r
-damageData$propDmgDollars = damageData$propMultiplier * damageData$PROPDMG / damageData$inflationFactor
-damageData$cropDmgDollars = damageData$cropMultiplier * damageData$CROPDMG / damageData$inflationFactor
-
-uncategorized = damageData[is.na(damageData$event),]
-
 damage = damageData[!is.na(damageData$event), c("FATALITIES", "INJURIES", "propDmgDollars", "cropDmgDollars", "event")]
 damage$event = factor(damage$event)
 
+totals = ddply(damage, .(event), summarize,
+               injuries = sum(INJURIES),
+               fatalities = sum(FATALITIES),
+               cropDamage = sum(cropDmgDollars),
+               propDamage = sum(propDmgDollars))
+```
+We calculate the relative contributions of each event type to it's category. We will discard all event types with little impact.
+
+```r
+totals$propDamagePct = 100 * totals$propDamage / sum(totals$propDamage)
+totals$cropDamagePct = 100 * totals$cropDamage / sum(totals$cropDamage)
+totals$injuriesPct = 100 * totals$injuries / sum(totals$injuries)
+totals$fatalitiesPct = 100 * totals$fatalities / sum(totals$fatalities)
+totals = ddply(damage, .(event), summarize,
+               injuries = sum(INJURIES),
+               fatalities = sum(FATALITIES),
+               cropDamage = sum(cropDmgDollars),
+               propDamage = sum(propDmgDollars))
+totals$propDamagePct = 100 * totals$propDamage / sum(totals$propDamage)
+totals$cropDamagePct = 100 * totals$cropDamage / sum(totals$cropDamage)
+totals$injuriesPct = 100 * totals$injuries / sum(totals$injuries)
+totals$fatalitiesPct = 100 * totals$fatalities / sum(totals$fatalities)
+
+damageEvents = totals[,c("event","propDamage", "propDamagePct", "cropDamage", "cropDamagePct")]
+healthEvents = totals[,c("event","injuries", "injuriesPct", "fatalities", "fatalitiesPct")]
+```
+Gather some final statistics about the data processing.
+
+```r
+uncategorized = damageData[is.na(damageData$event),]
+message("uncategorized row count: ", nrow(uncategorized))
+```
+
+```
+## uncategorized row count: 82
+```
+
+```r
 message("uncategorized damage: ", sum(uncategorized$propDmgDollars) + sum(uncategorized$cropDmgDollars))
 ```
 
@@ -260,106 +216,38 @@ message("categorized damage: ", sum(damage$propDmgDollars) + sum(damage$cropDmgD
 ```
 
 ```
-## categorized damage: 644753714588.105
+## categorized damage: 644681547866.381
 ```
-
-```r
-totals = ddply(damage, .(event), summarize,
-               injuries = sum(INJURIES),
-               fatalities = sum(FATALITIES),
-               cropDamage = sum(cropDmgDollars),
-               propDamage = sum(propDmgDollars))
-totals$propDamagePct = 100 * totals$propDamage / sum(totals$propDamage)
-totals$cropDamagePct = 100 * totals$cropDamage / sum(totals$cropDamage)
-totals$injuriesPct = 100 * totals$injuries / sum(totals$injuries)
-totals$fatalitiesPct = 100 * totals$fatalities / sum(totals$fatalities)
-totals$fatalitiesRank = rank(totals$fatalitiesPct)
-totals$injuriesRank = rank(totals$injuriesPct)
-totals$cropDamageRank = rank(totals$cropDamagePct)
-totals$propDamageRank = rank(totals$propDamagePct)
-cutoff = 26
-worstEvents = totals[totals$fatalitiesRank > cutoff &
-                    totals$injuriesRank > cutoff &
-                    totals$cropDamageRank > cutoff &
-                    totals$propDamageRank > cutoff,]
-
-final = worstEvents[,c("event","propDamage","cropDamage","injuries","fatalities")]
-final = melt(final, id=c("event"))
-colnames(final)[2] = "category"
-final
-```
-
-```
-##                  event   category     value
-## 1             blizzard propDamage 9.171e+08
-## 2          flash flood propDamage 2.940e+10
-## 3                flood propDamage 1.635e+11
-## 4           heavy snow propDamage 1.310e+09
-## 5            high wind propDamage 7.437e+09
-## 6  hurricane (typhoon) propDamage 1.022e+11
-## 7          strong wind propDamage 2.000e+08
-## 8    thunderstorm wind propDamage 1.651e+10
-## 9              tornado propDamage 1.414e+11
-## 10      tropical storm propDamage 9.694e+09
-## 11            wildfire propDamage 1.052e+10
-## 12        winter storm propDamage 9.750e+09
-## 13            blizzard cropDamage 1.734e+08
-## 14         flash flood cropDamage 9.756e+09
-## 15               flood cropDamage 6.774e+09
-## 16          heavy snow cropDamage 1.937e+08
-## 17           high wind cropDamage 1.035e+09
-## 18 hurricane (typhoon) cropDamage 6.938e+09
-## 19         strong wind cropDamage 7.432e+07
-## 20   thunderstorm wind cropDamage 1.615e+09
-## 21             tornado cropDamage 5.302e+08
-## 22      tropical storm cropDamage 8.532e+08
-## 23            wildfire cropDamage 4.795e+08
-## 24        winter storm cropDamage 3.998e+07
-## 25            blizzard   injuries 7.780e+02
-## 26         flash flood   injuries 1.578e+03
-## 27               flood   injuries 6.785e+03
-## 28          heavy snow   injuries 7.820e+02
-## 29           high wind   injuries 1.289e+03
-## 30 hurricane (typhoon)   injuries 1.328e+03
-## 31         strong wind   injuries 2.180e+02
-## 32   thunderstorm wind   injuries 5.014e+03
-## 33             tornado   injuries 9.049e+04
-## 34      tropical storm   injuries 3.800e+02
-## 35            wildfire   injuries 1.328e+03
-## 36        winter storm   injuries 1.027e+03
-## 37            blizzard fatalities 7.000e+01
-## 38         flash flood fatalities 7.780e+02
-## 39               flood fatalities 4.140e+02
-## 40          heavy snow fatalities 6.200e+01
-## 41           high wind fatalities 2.060e+02
-## 42 hurricane (typhoon) fatalities 1.090e+02
-## 43         strong wind fatalities 7.700e+01
-## 44   thunderstorm wind fatalities 3.760e+02
-## 45             tornado fatalities 5.591e+03
-## 46      tropical storm fatalities 5.600e+01
-## 47            wildfire fatalities 7.900e+01
-## 48        winter storm fatalities 8.900e+01
-```
-
-(48 baseline values, in eventtypes.csv)
-(data loading)
-(assignment of events)
-(processing of damage costs)
-(verifying small # of uncategorized)
-(describe selection of most damaging event types)
-(chart creation)
-
 
 # Results
 ******
-Here's some text
+We only retain events that are a significant contributor (> %1) to the damage and health totals. 
 
 ```r
-set.seed(1)
-x = rnorm(100)
-mean(x)
+damageEvents = totals[,c("event","propDamage", "propDamagePct", "cropDamage", "cropDamagePct")]
+healthEvents = totals[,c("event","injuries", "injuriesPct", "fatalities", "fatalitiesPct")]
+worstDamageEvents = damageEvents[damageEvents$propDamagePct > 1 & damageEvents$cropDamagePct > 1, c("event","propDamage", "cropDamage")]
+colnames(worstDamageEvents)[2:3] = c("Property Damage", "Crop Damage")
+worstHealthEvents = healthEvents[healthEvents$injuriesPct > 1 & healthEvents$fatalitiesPct > 1, c("event","injuries", "fatalities")]
+colnames(worstHealthEvents)[2:3] = c("Injuries", "Fatalities")
+
+damageCollated = melt(worstDamageEvents, id=c("event"))
+healthCollated = melt(worstHealthEvents, id=c("event"))
+colnames(damageCollated)[2] = "category"
+colnames(healthCollated)[2] = "category"
+damageCollated$value = damageCollated$value / 1000000
+
+ggplot(damageCollated, aes(event, value)) +
+    geom_bar(aes(fill = category), position = "dodge", stat = "identity") + coord_flip() +
+    xlab("Event Type") + ylab("Total Damage (Millons of Dollars)")
 ```
 
+![plot of chunk create-plots](./RepData_PeerAssessment2_files/figure-html/create-plots1.png) 
+
+```r
+ggplot(healthCollated, aes(event, value)) +
+    geom_bar(aes(fill = category), position = "dodge", stat="identity") + coord_flip() +
+    xlab("Event Type") + ylab("Number of Affected People")
 ```
-## [1] 0.1089
-```
+
+![plot of chunk create-plots](./RepData_PeerAssessment2_files/figure-html/create-plots2.png) 

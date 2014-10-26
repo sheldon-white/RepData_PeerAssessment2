@@ -35,6 +35,8 @@ library(stringr)
 library(plyr)
 library(reshape)
 library(ggplot2)
+library(xtable)
+
 stormData = read.csv(bzfile("repdata-data-StormData.csv.bz2"))
 ```
 Only retain the rows that contain damage, injuries or fatalities; damage exponents must be in the accepted set. We can also discard most of the columns, but we'll also need the 'year' value
@@ -221,34 +223,69 @@ damageCollated$value = damageCollated$value / 1000000
 ******
 # Results
 
-The first plot shows the total damage due to event types with a major impact:
+The first tables and plot show the total damage due to event types with a major impact.
+
+#### Property Damage
+```{r results = "asis", echo = FALSE}
+propdamage = damageCollated[damageCollated$category == "Property Damage", c(1, 3)]
+print(xtable(arrange(propdamage, desc(value))), type = "html", comment = FALSE)
+```
+
+#### Crop Damage
+```{r results = "asis", echo = FALSE}
+cropdamage = damageCollated[damageCollated$category == "Crop Damage", c(1, 3)]
+print(xtable(arrange(cropdamage, desc(value))), type = "html", comment = FALSE)
+```
+
+<p>
+**And a picture:**
+
 ```{r event-damage}
 ggplot(damageCollated, aes(event, value)) +
     geom_bar(aes(fill = category), position = "dodge", stat = "identity") + coord_flip() +
     xlab("Event Type") + ylab("Total Damage (Millons of Dollars)") + ggtitle("Damage Totals in US (1993 - 2011)\n")
 ```
 
-Major points revealed by this plot:
+##Major points revealed by this data
 
 * **Flooding and hurricanes cause far more damage than other weather events.**
 * Property damage values are far higher than crop damage values.
 
-The second plot shows the injuries and fatalities due to event types with a major impact:
+******
+The second tables and plot show the injuries and fatalities due to event types with a major impact:
+
+
+#### Injuries
+```{r results = "asis", echo = FALSE}
+injuries = healthCollated[healthCollated$category == "Injuries", c(1, 3)]
+print(xtable(arrange(injuries, desc(value))), type = "html", comment = FALSE)
+```
+
+#### Fatalities
+```{r results = "asis", echo = FALSE}
+fatalities = healthCollated[healthCollated$category == "Fatalities", c(1, 3)]
+print(xtable(arrange(fatalities, desc(value))), type = "html", comment = FALSE)
+```
+<p>
+**And a picture:**
+
 ```{r event-injury}
 ggplot(healthCollated, aes(event, value)) +
     geom_bar(aes(fill = category), position = "dodge", stat="identity") + coord_flip() +
     xlab("Event Type") + ylab("Number of Affected People") + ggtitle("Injury and Fatality Totals in US (1993 - 2011)\n")
 ```
 
-Major points revealed by this plot:
+##Major points revealed by this data:
 
-* **Tornadoes are by far the biggest cause of injuries, but (surprisingly) heat-related weather has caused slightly more deaths.**
+* **Tornadoes are by far the biggest cause of injuries, but (surprisingly) weather in the "excessive heat" category has caused slightly more deaths.**
 * As expected, injuries far exceed fatalities.
 
-It is interesting to see the year-by-year trends in reported damages. We can plot the annual costs due to the most destructive weather types:
+<p>
+******
+It's also interesting to see the year-by-year trends in reported damages. We can plot the annual costs due to the most destructive weather types:
 
 ```{r major-events-by-year}
-subset = damage[damage$event %in% c("tornado", "flood", "hurricane (typhoon)"),]
+subset = damage[damage$event %in% c("tornado", "flood", "excessive heat", "hurricane (typhoon)"),]
 totals = ddply(subset, c("event", "year"), summarize,
                injuries = sum(INJURIES),
                fatalities = sum(FATALITIES),

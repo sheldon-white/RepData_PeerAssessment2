@@ -43,6 +43,14 @@ library(reshape)
 
 ```r
 library(ggplot2)
+library(xtable)
+```
+
+```
+## Warning: package 'xtable' was built under R version 3.1.1
+```
+
+```r
 stormData = read.csv(bzfile("repdata-data-StormData.csv.bz2"))
 ```
 Only retain the rows that contain damage, injuries or fatalities; damage exponents must be in the accepted set. We can also discard most of the columns, but we'll also need the 'year' value
@@ -271,7 +279,49 @@ damageCollated$value = damageCollated$value / 1000000
 ******
 # Results
 
-The first plot shows the total damage due to event types with a major impact:
+The first tables and plot show the total damage due to event types with a major impact.
+
+#### Property Damage
+<table border=1>
+<tr> <th>  </th> <th> event </th> <th> value </th>  </tr>
+  <tr> <td align="right"> 1 </td> <td> flood </td> <td align="right"> 163511.87 </td> </tr>
+  <tr> <td align="right"> 2 </td> <td> hurricane (typhoon) </td> <td align="right"> 102166.52 </td> </tr>
+  <tr> <td align="right"> 3 </td> <td> storm surge/tide </td> <td align="right"> 54837.37 </td> </tr>
+  <tr> <td align="right"> 4 </td> <td> tornado </td> <td align="right"> 30575.04 </td> </tr>
+  <tr> <td align="right"> 5 </td> <td> flash flood </td> <td align="right"> 29400.15 </td> </tr>
+  <tr> <td align="right"> 6 </td> <td> hail </td> <td align="right"> 19192.02 </td> </tr>
+  <tr> <td align="right"> 7 </td> <td> thunderstorm wind </td> <td align="right"> 16502.02 </td> </tr>
+  <tr> <td align="right"> 8 </td> <td> wildfire </td> <td align="right"> 10517.46 </td> </tr>
+  <tr> <td align="right"> 9 </td> <td> winter storm </td> <td align="right"> 9750.07 </td> </tr>
+  <tr> <td align="right"> 10 </td> <td> tropical storm </td> <td align="right"> 9693.55 </td> </tr>
+  <tr> <td align="right"> 11 </td> <td> ice storm </td> <td align="right"> 5001.90 </td> </tr>
+  <tr> <td align="right"> 12 </td> <td> drought </td> <td align="right"> 1299.29 </td> </tr>
+  <tr> <td align="right"> 13 </td> <td> extreme cold/wind chill </td> <td align="right"> 195.00 </td> </tr>
+  <tr> <td align="right"> 14 </td> <td> frost/freeze </td> <td align="right"> 45.55 </td> </tr>
+   </table>
+
+#### Crop Damage
+<table border=1>
+<tr> <th>  </th> <th> event </th> <th> value </th>  </tr>
+  <tr> <td align="right"> 1 </td> <td> drought </td> <td align="right"> 17771.11 </td> </tr>
+  <tr> <td align="right"> 2 </td> <td> flash flood </td> <td align="right"> 9755.94 </td> </tr>
+  <tr> <td align="right"> 3 </td> <td> ice storm </td> <td align="right"> 7617.57 </td> </tr>
+  <tr> <td align="right"> 4 </td> <td> hurricane (typhoon) </td> <td align="right"> 6922.93 </td> </tr>
+  <tr> <td align="right"> 5 </td> <td> flood </td> <td align="right"> 6773.75 </td> </tr>
+  <tr> <td align="right"> 6 </td> <td> hail </td> <td align="right"> 3858.23 </td> </tr>
+  <tr> <td align="right"> 7 </td> <td> frost/freeze </td> <td align="right"> 2485.87 </td> </tr>
+  <tr> <td align="right"> 8 </td> <td> extreme cold/wind chill </td> <td align="right"> 1822.99 </td> </tr>
+  <tr> <td align="right"> 9 </td> <td> thunderstorm wind </td> <td align="right"> 1614.74 </td> </tr>
+  <tr> <td align="right"> 10 </td> <td> tropical storm </td> <td align="right"> 853.18 </td> </tr>
+  <tr> <td align="right"> 11 </td> <td> tornado </td> <td align="right"> 530.18 </td> </tr>
+  <tr> <td align="right"> 12 </td> <td> wildfire </td> <td align="right"> 479.47 </td> </tr>
+  <tr> <td align="right"> 13 </td> <td> winter storm </td> <td align="right"> 39.98 </td> </tr>
+  <tr> <td align="right"> 14 </td> <td> storm surge/tide </td> <td align="right"> 0.90 </td> </tr>
+   </table>
+
+<p>
+**And a picture:**
+
 
 ```r
 ggplot(damageCollated, aes(event, value)) +
@@ -281,12 +331,55 @@ ggplot(damageCollated, aes(event, value)) +
 
 ![plot of chunk event-damage](./RepData_PeerAssessment2_files/figure-html/event-damage.png) 
 
-Major points revealed by this plot:
+##Major points revealed by this data
 
 * **Flooding and hurricanes cause far more damage than other weather events.**
 * Property damage values are far higher than crop damage values.
 
-The second plot shows the injuries and fatalities due to event types with a major impact:
+******
+The second tables and plot show the injuries and fatalities due to event types with a major impact:
+
+
+#### Injuries
+<table border=1>
+<tr> <th>  </th> <th> event </th> <th> value </th>  </tr>
+  <tr> <td align="right"> 1 </td> <td> tornado </td> <td align="right"> 23371.00 </td> </tr>
+  <tr> <td align="right"> 2 </td> <td> flood </td> <td align="right"> 6868.00 </td> </tr>
+  <tr> <td align="right"> 3 </td> <td> excessive heat </td> <td align="right"> 6525.00 </td> </tr>
+  <tr> <td align="right"> 4 </td> <td> thunderstorm wind </td> <td align="right"> 6221.00 </td> </tr>
+  <tr> <td align="right"> 5 </td> <td> lightning </td> <td align="right"> 5230.00 </td> </tr>
+  <tr> <td align="right"> 6 </td> <td> heat </td> <td align="right"> 2274.00 </td> </tr>
+  <tr> <td align="right"> 7 </td> <td> ice storm </td> <td align="right"> 1975.00 </td> </tr>
+  <tr> <td align="right"> 8 </td> <td> flash flood </td> <td align="right"> 1813.00 </td> </tr>
+  <tr> <td align="right"> 9 </td> <td> high wind </td> <td align="right"> 1650.00 </td> </tr>
+  <tr> <td align="right"> 10 </td> <td> wildfire </td> <td align="right"> 1608.00 </td> </tr>
+  <tr> <td align="right"> 11 </td> <td> high surf </td> <td align="right"> 655.00 </td> </tr>
+  <tr> <td align="right"> 12 </td> <td> extreme cold/wind chill </td> <td align="right"> 260.00 </td> </tr>
+  <tr> <td align="right"> 13 </td> <td> rip current </td> <td align="right"> 232.00 </td> </tr>
+  <tr> <td align="right"> 14 </td> <td> avalanche </td> <td align="right"> 170.00 </td> </tr>
+   </table>
+
+#### Fatalities
+<table border=1>
+<tr> <th>  </th> <th> event </th> <th> value </th>  </tr>
+  <tr> <td align="right"> 1 </td> <td> excessive heat </td> <td align="right"> 1903.00 </td> </tr>
+  <tr> <td align="right"> 2 </td> <td> tornado </td> <td align="right"> 1624.00 </td> </tr>
+  <tr> <td align="right"> 3 </td> <td> heat </td> <td align="right"> 1073.00 </td> </tr>
+  <tr> <td align="right"> 4 </td> <td> flash flood </td> <td align="right"> 1051.00 </td> </tr>
+  <tr> <td align="right"> 5 </td> <td> lightning </td> <td align="right"> 816.00 </td> </tr>
+  <tr> <td align="right"> 6 </td> <td> flood </td> <td align="right"> 502.00 </td> </tr>
+  <tr> <td align="right"> 7 </td> <td> thunderstorm wind </td> <td align="right"> 486.00 </td> </tr>
+  <tr> <td align="right"> 8 </td> <td> rip current </td> <td align="right"> 368.00 </td> </tr>
+  <tr> <td align="right"> 9 </td> <td> high surf </td> <td align="right"> 362.00 </td> </tr>
+  <tr> <td align="right"> 10 </td> <td> high wind </td> <td align="right"> 340.00 </td> </tr>
+  <tr> <td align="right"> 11 </td> <td> extreme cold/wind chill </td> <td align="right"> 313.00 </td> </tr>
+  <tr> <td align="right"> 12 </td> <td> avalanche </td> <td align="right"> 225.00 </td> </tr>
+  <tr> <td align="right"> 13 </td> <td> wildfire </td> <td align="right"> 90.00 </td> </tr>
+  <tr> <td align="right"> 14 </td> <td> ice storm </td> <td align="right"> 89.00 </td> </tr>
+   </table>
+<p>
+**And a picture:**
+
 
 ```r
 ggplot(healthCollated, aes(event, value)) +
@@ -296,16 +389,18 @@ ggplot(healthCollated, aes(event, value)) +
 
 ![plot of chunk event-injury](./RepData_PeerAssessment2_files/figure-html/event-injury.png) 
 
-Major points revealed by this plot:
+##Major points revealed by this data:
 
-* **Tornadoes are by far the biggest cause of injuries, but (surprisingly) heat-related weather has caused slightly more deaths.**
+* **Tornadoes are by far the biggest cause of injuries, but (surprisingly) weather in the "excessive heat" category has caused slightly more deaths.**
 * As expected, injuries far exceed fatalities.
 
-It is interesting to see the year-by-year trends in reported damages. We can plot the annual costs due to the most destructive weather types:
+<p>
+******
+It's also interesting to see the year-by-year trends in reported damages. We can plot the annual costs due to the most destructive weather types:
 
 
 ```r
-subset = damage[damage$event %in% c("tornado", "flood", "hurricane (typhoon)"),]
+subset = damage[damage$event %in% c("tornado", "flood", "excessive heat", "hurricane (typhoon)"),]
 totals = ddply(subset, c("event", "year"), summarize,
                injuries = sum(INJURIES),
                fatalities = sum(FATALITIES),

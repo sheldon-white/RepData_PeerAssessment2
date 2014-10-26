@@ -298,7 +298,7 @@ ggplot(healthCollated, aes(event, value)) +
 
 Major points revealed by this plot:
 
-* **Tornadoes are by far the biggest cause of injuries and deaths.**
+* **Tornadoes are by far the biggest cause of injuries, but (surprisingly) heat-related weather has caused slightly more deaths.**
 * As expected, injuries far exceed fatalities.
 
 It is interesting to see the year-by-year trends in reported damages. We can plot the annual costs due to the most destructive weather types:

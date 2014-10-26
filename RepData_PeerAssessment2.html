@@ -155,18 +155,21 @@ hr {
 
 <hr>
 
-<p>It&#39;s well known that severe weather events can have a major impact on municipal well-being; if a tornado touches down in your city, you&#39;re screwed. This report extracts and presents the primary weather types contributing to agricultural, physical and health damage in the US between 1950 and 2011.
-This source data was a dump of NOAA storm events database (<a href="http://www.ncdc.noaa.gov/stormevents/">http://www.ncdc.noaa.gov/stormevents/</a>) from 1950 to 2011. Data processing was assisted by use of a reference document: &quot;￼NATIONAL WEATHER SERVICE INSTRUCTION 10-1605&quot;, included here as the file &quot;repdata-peer2_doc-pd01016005curr.pdf&quot;. This documents groups all weather events into a set of 48 categories, but many of the EVTYPE records in the database did not match this set.
-Much of the work preparing this report was creating a set of patterns that could be applied to coerce all records into these 48 categories. After assignment to events types, the data corresponding to events with significant impact (here defined as contributing greater than two percent to the total damage value) are extracted and plotted by event type.</p>
+<p>It&#39;s well known that severe weather events can have a major impact on municipal well-being; if a tornado touches down in your city, you&#39;re screwed. This report extracts and presents the primary weather types contributing to agricultural, physical and health damage in the US.</p>
+
+<p>This source data was a dump of NOAA storm events database (<a href="http://www.ncdc.noaa.gov/stormevents/">http://www.ncdc.noaa.gov/stormevents/</a>) from 1950 to 2011. Data processing was assisted by use of a reference document: &quot;￼NATIONAL WEATHER SERVICE INSTRUCTION 10-1605&quot;, included here as the file &quot;repdata-peer2_doc-pd01016005curr.pdf&quot;. This documents groups all weather events into a set of 48 categories, but many of the EVTYPE records in the database did not match this set.</p>
+
+<p>Much of the work preparing this report was creating a set of patterns that could be applied to coerce all records into these 48 categories. After assignment to events types, the data corresponding to events with significant impact (here defined as contributing greater than two percent to the total damage value) are extracted and plotted by event type.</p>
 
 <p>All supporting data files, documents and source code can be found at: <a href="https://github.com/sheldon-white/RepData_PeerAssessment2">https://github.com/sheldon-white/RepData_PeerAssessment2</a></p>
 
 <hr>
 
-<h1>Challenges</h1>
+<h1>Challenges and Assumptions</h1>
 
 <ul>
 <li><strong>Unclear data description:</strong> There isn&#39;t a &quot;proper&quot; databook supplied for this dataset. The included PDF file provides general descriptions of the data but in the end it was necessary to make assumptions in interpreting the data. </li>
+<li><strong>Incomplete records:</strong> There is very little data before 1993; before 1980 only tornado events are &quot;complete&quot; by the other criteria listed here. These older records were ultimately discarded because their presence would greatly distort the damage totals towards tornadoes. The report&#39;s remaining data document almost 20 years of the recent past, which is good enough for its purposes.</li>
 <li><strong>Damage exponents:</strong> These columns (PROPDMGEXP and CROPDMGEXP) represent multipliers for the dollar amounts represented by the PROPDMG (property damage) and CROPDMG (crop damage) columns. In the end, only &quot;H&quot;, &quot;K&quot;, &quot;M&quot;, &quot;B&quot; were used because their meaning was fairly clear (after internet research) and seemed to be consistent with a sampling of the REMARKS column descriptions. The rows containing numeric PROPDMGEXP and CROPDMGEXP values were ultimately rejected, because inspection of their REMARKS values showed many descriptions that had no relation to the calculated damage values. For instance, damage exponents of 12 or 14 (which imply catastrophic dollar amounts) could not be reconciled with the corresponding event descriptions.</li>
 <li><strong>Irregular EVTYPE values:</strong> EVTYPE values not matching the 48 official categories were mapped to these categories through inspection, trial and error, and creation of pattern-matching rules. The set of patterns listed here results in the assignment of %99.97 of the data to these 48 values.</li>
 <li><strong>Inflation:</strong> Damage values were inflation-adjusted to 2011 values using conversion factors extracted from data compiled at the Oregon State Political Science department: <a href="http://oregonstate.edu/cla/polisci/sites/default/files/faculty-research/sahr/inflation-conversion/excel/infcf17742014.xls">http://oregonstate.edu/cla/polisci/sites/default/files/faculty-research/sahr/inflation-conversion/excel/infcf17742014.xls</a>. Values A(210) - A(271) and T(210) - T(271) were extracted from this Excel file to create inflationFactors.csv. These numbers represent the number of old dollars equivalent to a 2011 dollar. (For example: 0.107 1950 dollars == one 2011 dollar.) The reported weather damage values are divided by these conversion values to obtain the equivalent 2011 damage values.</li>
@@ -235,6 +238,7 @@ evTypes$pattern = paste(&quot;^&quot;, evTypes$pattern, &quot;$&quot;, sep=&quot
     &quot;hail&quot;, &quot;hail&quot;,
     &quot;(sleet|freezing)&quot;, &quot;sleet&quot;,
     &quot;(swell|surf)&quot;, &quot;high surf&quot;,
+    &quot;rip currents&quot;, &quot;rip currents&quot;,
     &quot;spout&quot;, &quot;waterspout&quot;,
     &quot;(coastal storm|surge)&quot;, &quot;storm surge/tide&quot;,
     &quot;(extreme|severe|heavy|hvy|excessive|torrential|record|unusual).+cold&quot;, &quot;extreme cold/wind chill&quot;,
@@ -246,6 +250,7 @@ evTypes$pattern = paste(&quot;^&quot;, evTypes$pattern, &quot;$&quot;, sep=&quot
     &quot;(wave| seas)&quot;, &quot;high surf&quot;,
     &quot;fire&quot;, &quot;wildfire&quot;,
     &quot;wint&quot;, &quot;winter weather&quot;,
+    &quot;extreme heat&quot;, &quot;heat&quot;,
     &quot;(hot|warm)&quot;, &quot;heat&quot;,
     &quot;(slide|mud|landslump)&quot;, &quot;debris flow&quot;,
     &quot;avalance&quot;, &quot;avalanche&quot;,
@@ -274,7 +279,7 @@ a = apply(allRules, 1, function(row) {
 </code></pre>
 
 <p>Some samples are taken to see how the event types are reported in the past.
-Events reported in or before 1980:</p>
+&quot;Complete&quot; events reported in or before 1980:</p>
 
 <pre><code class="r">paste(unique(damageData$event[damageData$year &lt;= 1980 &amp; !is.na(damageData$event)]), collapse = &quot;,&quot;)
 </code></pre>
@@ -282,7 +287,7 @@ Events reported in or before 1980:</p>
 <pre><code>## [1] &quot;tornado&quot;
 </code></pre>
 
-<p>Events reported in or before 1990:</p>
+<p>&quot;Complete&quot; events reported in or before 1980:</p>
 
 <pre><code class="r">paste(unique(damageData$event[damageData$year &lt;= 1990 &amp; !is.na(damageData$event)]), collapse = &quot;,&quot;)
 </code></pre>
@@ -290,7 +295,7 @@ Events reported in or before 1980:</p>
 <pre><code>## [1] &quot;tornado,thunderstorm wind,hail&quot;
 </code></pre>
 
-<p>Events reported in or before 1993:</p>
+<p>&quot;Complete&quot; events reported in or before 1980:</p>
 
 <pre><code class="r">paste(unique(damageData$event[damageData$year &lt;= 1993 &amp; !is.na(damageData$event)]), collapse = &quot;,&quot;)
 </code></pre>
@@ -298,7 +303,7 @@ Events reported in or before 1980:</p>
 <pre><code>## [1] &quot;tornado,thunderstorm wind,hail,winter storm,lightning,high wind,high surf,coastal flood,heavy rain,flash flood,flood,heavy snow,ice storm,wildfire,winter weather,debris flow,dense fog,blizzard,cold/wind chill,extreme cold/wind chill,waterspout,storm surge/tide,hurricane (typhoon),avalanche,sleet,frost/freeze,heat,dust devil,drought,funnel cloud,dust storm,tropical storm&quot;
 </code></pre>
 
-<p>So there wasn&#39;t a full range of reported event types before 1993! Tornadoes and thunderstorms could be heavily overrepresented in the totals, especially taking inflation into account. We continue processing with records from 1993 onward.</p>
+<p>So we don&#39;t have a good representation of event types in the older records cleaned and filtered dataset. Tornadoes and thunderstorms could be heavily overrepresented in the totals, especially taking inflation into account. <strong>We continue processing with records from 1993 onward.</strong></p>
 
 <pre><code class="r">damageData = damageData[damageData$year &gt;= 1993,]
 </code></pre>
@@ -374,19 +379,19 @@ healthEvents = totals[,c(&quot;event&quot;,&quot;injuries&quot;, &quot;injuriesP
 message(&quot;uncategorized row count: &quot;, nrow(uncategorized))
 </code></pre>
 
-<pre><code>## uncategorized row count: 353
+<pre><code>## uncategorized row count: 95
 </code></pre>
 
 <pre><code class="r">message(&quot;uncategorized damage: &quot;, sum(uncategorized$propDmgDollars) + sum(uncategorized$cropDmgDollars))
 </code></pre>
 
-<pre><code>## uncategorized damage: 254399252.965303
+<pre><code>## uncategorized damage: 246438232.472558
 </code></pre>
 
 <pre><code class="r">message(&quot;categorized damage: &quot;, sum(damage$propDmgDollars) + sum(damage$cropDmgDollars))
 </code></pre>
 
-<pre><code>## categorized damage: 533861711297.686
+<pre><code>## categorized damage: 533869672318.179
 </code></pre>
 
 <p>For the first two plots we only retain events that are a significant contributor (&gt; %2) to the damage and health totals. </p>
@@ -413,7 +418,7 @@ damageCollated$value = damageCollated$value / 1000000
 
 <pre><code class="r">ggplot(damageCollated, aes(event, value)) +
     geom_bar(aes(fill = category), position = &quot;dodge&quot;, stat = &quot;identity&quot;) + coord_flip() +
-    xlab(&quot;Event Type&quot;) + ylab(&quot;Total Damage (Millons of Dollars)&quot;) + ggtitle(&quot;Damage Totals in US (1950 - 2011)\n&quot;)
+    xlab(&quot;Event Type&quot;) + ylab(&quot;Total Damage (Millons of Dollars)&quot;) + ggtitle(&quot;Damage Totals in US (1993 - 2011)\n&quot;)
 </code></pre>
 
 <p><img src="figure/event-damage.png" alt="plot of chunk event-damage"> </p>
@@ -421,15 +426,15 @@ damageCollated$value = damageCollated$value / 1000000
 <p>Major points revealed by this plot:</p>
 
 <ul>
+<li><strong>Flooding and hurricanes cause far more damage than other weather events.</strong></li>
 <li>Property damage values are far higher than crop damage values.</li>
-<li>Flooding and hurricanes have far higher impacts than other weather events.</li>
 </ul>
 
 <p>The second plot shows the injuries and fatalities due to event types with a major impact:</p>
 
 <pre><code class="r">ggplot(healthCollated, aes(event, value)) +
     geom_bar(aes(fill = category), position = &quot;dodge&quot;, stat=&quot;identity&quot;) + coord_flip() +
-    xlab(&quot;Event Type&quot;) + ylab(&quot;Number of Affected People&quot;) + ggtitle(&quot;Injury and Fatality Totals in US (1950 - 2011)\n&quot;)
+    xlab(&quot;Event Type&quot;) + ylab(&quot;Number of Affected People&quot;) + ggtitle(&quot;Injury and Fatality Totals in US (1993 - 2011)\n&quot;)
 </code></pre>
 
 <p><img src="figure/event-injury.png" alt="plot of chunk event-injury"> </p>
@@ -437,8 +442,8 @@ damageCollated$value = damageCollated$value / 1000000
 <p>Major points revealed by this plot:</p>
 
 <ul>
+<li><strong>Tornadoes are by far the biggest cause of injuries and deaths.</strong></li>
 <li>As expected, injuries far exceed fatalities.</li>
-<li>Tornadoes are by far the biggest cause of injuries and deaths.</li>
 </ul>
 
 <p>It is interesting to see the year-by-year trends in reported damages. We can plot the annual costs due to the most destructive weather types:</p>

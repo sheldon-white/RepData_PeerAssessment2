@@ -1,19 +1,22 @@
-# RepData Project 2: Damage and Health Effects of Weather Events: 1950 - 2011
+# RepData Project 2: Damage and Health Effects of Weather Events
 
 ******
 # Synopsis
 ******
 
-It's well known that severe weather events can have a major impact on municipal well-being; if a tornado touches down in your city, you're screwed. This report extracts and presents the primary weather types contributing to agricultural, physical and health damage in the US between 1950 and 2011.
+It's well known that severe weather events can have a major impact on municipal well-being; if a tornado touches down in your city, you're screwed. This report extracts and presents the primary weather types contributing to agricultural, physical and health damage in the US.
+
 This source data was a dump of NOAA storm events database (http://www.ncdc.noaa.gov/stormevents/) from 1950 to 2011. Data processing was assisted by use of a reference document: "￼NATIONAL WEATHER SERVICE INSTRUCTION 10-1605", included here as the file "repdata-peer2_doc-pd01016005curr.pdf". This documents groups all weather events into a set of 48 categories, but many of the EVTYPE records in the database did not match this set.
+
 Much of the work preparing this report was creating a set of patterns that could be applied to coerce all records into these 48 categories. After assignment to events types, the data corresponding to events with significant impact (here defined as contributing greater than two percent to the total damage value) are extracted and plotted by event type.
 
 All supporting data files, documents and source code can be found at: https://github.com/sheldon-white/RepData_PeerAssessment2
 
 ******
-# Challenges
+# Challenges and Assumptions
 
 * **Unclear data description:** There isn't a "proper" databook supplied for this dataset. The included PDF file provides general descriptions of the data but in the end it was necessary to make assumptions in interpreting the data. 
+* **Incomplete records:** There is very little data before 1993; before 1980 only tornado events are "complete" by the other criteria listed here. These older records were ultimately discarded because their presence would greatly distort the damage totals towards tornadoes. The report's remaining data document almost 20 years of the recent past, which is good enough for its purposes.
 * **Damage exponents:** These columns (PROPDMGEXP and CROPDMGEXP) represent multipliers for the dollar amounts represented by the PROPDMG (property damage) and CROPDMG (crop damage) columns. In the end, only "H", "K", "M", "B" were used because their meaning was fairly clear (after internet research) and seemed to be consistent with a sampling of the REMARKS column descriptions. The rows containing numeric PROPDMGEXP and CROPDMGEXP values were ultimately rejected, because inspection of their REMARKS values showed many descriptions that had no relation to the calculated damage values. For instance, damage exponents of 12 or 14 (which imply catastrophic dollar amounts) could not be reconciled with the corresponding event descriptions.
 * **Irregular EVTYPE values:** EVTYPE values not matching the 48 official categories were mapped to these categories through inspection, trial and error, and creation of pattern-matching rules. The set of patterns listed here results in the assignment of %99.97 of the data to these 48 values.
 * **Inflation:** Damage values were inflation-adjusted to 2011 values using conversion factors extracted from data compiled at the Oregon State Political Science department: http://oregonstate.edu/cla/polisci/sites/default/files/faculty-research/sahr/inflation-conversion/excel/infcf17742014.xls. Values A(210) - A(271) and T(210) - T(271) were extracted from this Excel file to create inflationFactors.csv. These numbers represent the number of old dollars equivalent to a 2011 dollar. (For example: 0.107 1950 dollars == one 2011 dollar.) The reported weather damage values are divided by these conversion values to obtain the equivalent 2011 damage values.
@@ -84,6 +87,7 @@ rules = c(
     "hail", "hail",
     "(sleet|freezing)", "sleet",
     "(swell|surf)", "high surf",
+    "rip currents", "rip currents",
     "spout", "waterspout",
     "(coastal storm|surge)", "storm surge/tide",
     "(extreme|severe|heavy|hvy|excessive|torrential|record|unusual).+cold", "extreme cold/wind chill",
@@ -95,6 +99,7 @@ rules = c(
     "(wave| seas)", "high surf",
     "fire", "wildfire",
     "wint", "winter weather",
+    "extreme heat", "heat",
     "(hot|warm)", "heat",
     "(slide|mud|landslump)", "debris flow",
     "avalance", "avalanche",
@@ -123,7 +128,7 @@ a = apply(allRules, 1, function(row) {
 })
 ```
 Some samples are taken to see how the event types are reported in the past.
-Events reported in or before 1980:
+"Complete" events reported in or before 1980:
 
 ```r
 paste(unique(damageData$event[damageData$year <= 1980 & !is.na(damageData$event)]), collapse = ",")
@@ -132,7 +137,7 @@ paste(unique(damageData$event[damageData$year <= 1980 & !is.na(damageData$event)
 ```
 ## [1] "tornado"
 ```
-Events reported in or before 1990:
+"Complete" events reported in or before 1980:
 
 ```r
 paste(unique(damageData$event[damageData$year <= 1990 & !is.na(damageData$event)]), collapse = ",")
@@ -141,7 +146,7 @@ paste(unique(damageData$event[damageData$year <= 1990 & !is.na(damageData$event)
 ```
 ## [1] "tornado,thunderstorm wind,hail"
 ```
-Events reported in or before 1993:
+"Complete" events reported in or before 1980:
 
 ```r
 paste(unique(damageData$event[damageData$year <= 1993 & !is.na(damageData$event)]), collapse = ",")
@@ -150,7 +155,7 @@ paste(unique(damageData$event[damageData$year <= 1993 & !is.na(damageData$event)
 ```
 ## [1] "tornado,thunderstorm wind,hail,winter storm,lightning,high wind,high surf,coastal flood,heavy rain,flash flood,flood,heavy snow,ice storm,wildfire,winter weather,debris flow,dense fog,blizzard,cold/wind chill,extreme cold/wind chill,waterspout,storm surge/tide,hurricane (typhoon),avalanche,sleet,frost/freeze,heat,dust devil,drought,funnel cloud,dust storm,tropical storm"
 ```
-So there wasn't a full range of reported event types before 1993! Tornadoes and thunderstorms could be heavily overrepresented in the totals, especially taking inflation into account. We continue processing with records from 1993 onward.
+So we don't have a good representation of event types in the older records cleaned and filtered dataset. Tornadoes and thunderstorms could be heavily overrepresented in the totals, especially taking inflation into account. **We continue processing with records from 1993 onward.**
 
 ```r
 damageData = damageData[damageData$year >= 1993,]
@@ -228,7 +233,7 @@ message("uncategorized row count: ", nrow(uncategorized))
 ```
 
 ```
-## uncategorized row count: 353
+## uncategorized row count: 95
 ```
 
 ```r
@@ -236,7 +241,7 @@ message("uncategorized damage: ", sum(uncategorized$propDmgDollars) + sum(uncate
 ```
 
 ```
-## uncategorized damage: 254399252.965303
+## uncategorized damage: 246438232.472558
 ```
 
 ```r
@@ -244,7 +249,7 @@ message("categorized damage: ", sum(damage$propDmgDollars) + sum(damage$cropDmgD
 ```
 
 ```
-## categorized damage: 533861711297.686
+## categorized damage: 533869672318.179
 ```
 For the first two plots we only retain events that are a significant contributor (> %2) to the damage and health totals. 
 
@@ -271,30 +276,30 @@ The first plot shows the total damage due to event types with a major impact:
 ```r
 ggplot(damageCollated, aes(event, value)) +
     geom_bar(aes(fill = category), position = "dodge", stat = "identity") + coord_flip() +
-    xlab("Event Type") + ylab("Total Damage (Millons of Dollars)") + ggtitle("Damage Totals in US (1950 - 2011)\n")
+    xlab("Event Type") + ylab("Total Damage (Millons of Dollars)") + ggtitle("Damage Totals in US (1993 - 2011)\n")
 ```
 
 ![plot of chunk event-damage](./RepData_PeerAssessment2_files/figure-html/event-damage.png) 
 
 Major points revealed by this plot:
 
+* **Flooding and hurricanes cause far more damage than other weather events.**
 * Property damage values are far higher than crop damage values.
-* Flooding and hurricanes have far higher impacts than other weather events.
 
 The second plot shows the injuries and fatalities due to event types with a major impact:
 
 ```r
 ggplot(healthCollated, aes(event, value)) +
     geom_bar(aes(fill = category), position = "dodge", stat="identity") + coord_flip() +
-    xlab("Event Type") + ylab("Number of Affected People") + ggtitle("Injury and Fatality Totals in US (1950 - 2011)\n")
+    xlab("Event Type") + ylab("Number of Affected People") + ggtitle("Injury and Fatality Totals in US (1993 - 2011)\n")
 ```
 
 ![plot of chunk event-injury](./RepData_PeerAssessment2_files/figure-html/event-injury.png) 
 
 Major points revealed by this plot:
 
+* **Tornadoes are by far the biggest cause of injuries and deaths.**
 * As expected, injuries far exceed fatalities.
-* Tornadoes are by far the biggest cause of injuries and deaths.
 
 It is interesting to see the year-by-year trends in reported damages. We can plot the annual costs due to the most destructive weather types:
 

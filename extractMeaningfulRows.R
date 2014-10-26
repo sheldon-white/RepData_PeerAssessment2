@@ -4,19 +4,18 @@ library(reshape)
 library(ggplot2)
 
 if (!exists("damageData")) {
-    #stormData = read.csv(bzfile("repdata-data-StormData.csv.bz2"))
-    #damageData = stormData[stormData$FATALITIES > 0 | stormData$INJURIES > 0 | stormData$PROPDMG > 0 | stormData$CROPDMG > 0,]
-    #damageData$normalizedEvtype = str_trim(tolower(damageData$EVTYPE))
-    #damageData$event = NA
-    #write.csv(damageData, file = "meaningful.csv")
+    stormData = read.csv(bzfile("repdata-data-StormData.csv.bz2"))
     
-    
-    rawDamageData = read.csv("meaningful.csv")
-    damageData = rawDamageData[,c("FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP", "BGN_DATE", "EVTYPE")]
+    damageData = stormData[,c("FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP", "BGN_DATE", "EVTYPE")]
+    damageData$year = strptime(damageData$BGN_DATE, "%m/%d/%Y %H:%M:%S")$year + 1900
+    class(damageData$year) = "integer"    
+    damageData$normalizedEvtype = str_trim(tolower(damageData$EVTYPE))
+    damageData$event = NA    
     damageData = damageData[damageData$INJURIES > 0 |
                             damageData$FATALITIES > 0 |
                             damageData$PROPDMGEXP %in% c("H", "M", "K", "B") |
                             damageData$CROPDMGEXP %in% c("H", "M", "K", "B"),]
+    
 }
 
 evTypes = read.csv("eventtypes.csv", header = FALSE)
@@ -40,7 +39,8 @@ rules = c(
     "mixed precipitation", "heavy rain",   
     "(heavy|hvy|excessive|torrential|record).+snow", "heavy snow",
     "snow", "winter weather",
-    "hail", "hail",
+    "hail", "hail",    
+    "rip currents", "rip currents",
     "(sleet|freezing)", "sleet",
     "(swell|surf)", "high surf",
     "spout", "waterspout",
@@ -54,7 +54,7 @@ rules = c(
     "(wave| seas)", "high surf",
     "fire", "wildfire",
     "wint", "winter weather",
-    "(hot|warm)", "heat",
+    "extreme heat", "heat",
     "(slide|mud|landslump)", "debris flow",
     "avalance", "avalanche",
     "flood", "flash flood",
@@ -77,8 +77,18 @@ apply(allRules, 1, function(row) {
     damageData[matches, "event"] <<- evtype
 })
 
+uncategorized = damageData[is.na(damageData$event),]
+
+
 damageData$year = strptime(damageData$BGN_DATE, "%m/%d/%Y %H:%M:%S")$year + 1900
 class(damageData$year) = "integer"
+
+message("1980: ", unique(damageData$event[damageData$year <= 1980 & !is.na(damageData$event)]))
+message("1990: ", unique(damageData$event[damageData$year <= 1990 & !is.na(damageData$event)]))
+message("1993: ", unique(damageData$event[damageData$year <= 1993 & !is.na(damageData$event)]))
+
+damageData = damageData[damageData$year >= 1993,]
+
 
 inflationFactors = read.csv("inflationFactors.csv", header = FALSE)
 colnames(inflationFactors) = c("year", "factor")
@@ -143,7 +153,7 @@ ggplot(healthCollated, aes(event, value)) +
     geom_bar(aes(fill = category), position = "dodge", stat="identity") + coord_flip() +
     xlab("Event Type") + ylab("Number of Affected People")
 
-subset = damage[damage$event %in% c("tornado", "flood", "hurricane (typhoon)", "thunderstorm wind"),]
+subset = damage[damage$event %in% c("tornado", "flood", "hurricane (typhoon)", "storm surge/tide"),]
 totals = ddply(subset, c("event", "year"), summarize,
                injuries = sum(INJURIES),
                fatalities = sum(FATALITIES),
